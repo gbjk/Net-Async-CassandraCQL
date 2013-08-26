@@ -77,4 +77,20 @@ $loop->add( $cass );
    is( scalar $f1->get, 5, '$f1->get is 5' );
 }
 
+# Error
+{
+   my $f = $cass->send_message( 5, "BODY" );
+
+   my $stream = "";
+   wait_for_stream{ length $stream >= 8 + 4 } $S2 => $stream;
+
+   $S2->syswrite( "\x81\x00\x01\x00\0\0\0\x0a\0\0\0\0\0\4Bad!" );
+
+   wait_for { $f->is_ready };
+
+   ok( $f->failure, '$f has failed' );
+   is_deeply( [ $f->failure ], [ "OPCODE_ERROR: Bad!\n", "\0\0\0\0\0\4Bad!", 0 ],
+              '$f->failure' );
+}
+
 done_testing;

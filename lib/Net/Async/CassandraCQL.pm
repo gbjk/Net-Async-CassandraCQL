@@ -13,6 +13,10 @@ our $VERSION = '0.01';
 
 use base qw( IO::Async::Protocol::Stream );
 
+use Protocol::CassandraCQL qw(
+   OPCODE_ERROR
+);
+
 use constant DEFAULT_CQL_PORT => 9042;
 
 =head1 NAME
@@ -54,7 +58,15 @@ sub on_read
 
    # TODO: flags
    if( my $f = $self->{streams}[$streamid] ) {
-      $f->done( $opcode, $body );
+      if( $opcode == OPCODE_ERROR ) {
+         my ( $err, $message ) = unpack "N n/a*", $body;
+         $f->fail( "OPCODE_ERROR: $message\n", $body, $err );
+      }
+      else {
+         $f->done( $opcode, $body );
+      }
+
+      undef $self->{streams}[$streamid];
    }
    else {
       print STDERR "Received a message opcode=$opcode for unknown stream $streamid\n";
@@ -92,7 +104,7 @@ sub send_message
    my $flags   = 0;
    $self->write( pack "C C C C N a*", $version, $flags, $id, $opcode, length $body, $body );
 
-   return $streams->[$id] = $self->loop->new_future->on_done( sub { undef $streams->[$id] } );
+   return $streams->[$id] = $self->loop->new_future;
 }
 
 =head1 TODO

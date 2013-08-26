@@ -6,8 +6,12 @@ use Module::Build;
 my $build = Module::Build->new(
    module_name => 'Net::Async::CassandraCQL',
    requires => {
+      'IO::Async::Protocol::Stream' => 0,
    },
    build_requires => {
+      'IO::Async::Test' => 0,
+      'IO::Async::Loop' => 0,
+      'Test::HexString' => 0,
       'Test::More' => '0.88', # done_testing
    },
    auto_configure_requires => 0, # Don't add M::B to configure_requires

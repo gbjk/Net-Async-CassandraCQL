@@ -108,6 +108,23 @@ sub column_name
    return join ".", @n;
 }
 
+=head2 $type = $result->column_type( $idx )
+
+Returns the type name of the column at the given index.
+
+=cut
+
+sub column_type
+{
+   my $self = shift;
+   my ( $idx ) = @_;
+
+   my ( $typeid, $custom ) = @{ $self->{columns}[$idx] }[3,4];
+   return $custom if $typeid == TYPE_CUSTOM;
+
+   return Protocol::CassandraCQL::typename( $typeid );
+}
+
 =head2 $n = $result->rows
 
 Returns the number of rows

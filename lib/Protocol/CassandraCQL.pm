@@ -85,6 +85,26 @@ our %EXPORT_TAGS = (
    'consistencies' => [ grep { m/^CONSISTENCY_/ } keys %CONSTANTS ],
 );
 
+=head1 FUNCTIONS
+
+=cut
+
+=head2 $name = typename( $type )
+
+Returns the name of the given C<TYPE_*> value, without the initial C<TYPE_>
+prefix.
+
+=cut
+
+my %typevals = map { substr($_, 5) => __PACKAGE__->$_ } grep { m/^TYPE_/ } keys %CONSTANTS;
+my %typenames = reverse %typevals;
+
+sub typename
+{
+   my ( $type ) = @_;
+   return $typenames{$type};
+}
+
 =head1 SPONSORS
 
 This code was paid for by

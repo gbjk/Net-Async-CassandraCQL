@@ -26,6 +26,8 @@ use Protocol::CassandraCQL::ResultRows;
        "test.table.column",
        '$result->column_name(0) scalar' );
 
+   is( $result->column_type(0), "TEXT", '$result->column_type(0)' );
+
    is( scalar $result->rows, 1, '$result->rows is 1' );
 
    is_deeply( [ $result->rowbytes( 0 ) ],

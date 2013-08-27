@@ -78,6 +78,13 @@ require constant;
 constant->import( $_, $CONSTANTS{$_} ) for keys %CONSTANTS;
 push @EXPORT_OK, keys %CONSTANTS;
 
+our %EXPORT_TAGS = (
+   'opcodes'       => [ grep { m/^OPCODE_/      } keys %CONSTANTS ],
+   'results'       => [ grep { m/^RESULT_/      } keys %CONSTANTS ],
+   'types'         => [ grep { m/^TYPE_/        } keys %CONSTANTS ],
+   'consistencies' => [ grep { m/^CONSISTENCY_/ } keys %CONSTANTS ],
+);
+
 package Protocol::CassandraCQL::Frame;
 
 # TODO: At least the lower-level methods of this class should be rewritten in

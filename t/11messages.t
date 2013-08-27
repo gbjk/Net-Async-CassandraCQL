@@ -45,4 +45,27 @@ $loop->add( $cass );
               '->startup->get returns nothing' );
 }
 
+{
+   my $f = $cass->options;
+
+   my $stream = "";
+   wait_for_stream { length $stream >= 8 } $S2 => $stream;
+
+   # OPCODE_OPTIONS
+   is_hexstr( $stream,
+              "\x01\x00\x01\x05\0\0\0\0",
+              'stream after ->options' );
+
+   # OPCODE_READY
+   $S2->syswrite( "\x81\x00\x01\x06\0\0\0\x2f\0\2" .
+                  "\x00\x0bCOMPRESSION\0\1\x00\x06snappy" .
+                  "\x00\x0bCQL_VERSION\0\1\x00\x053.0.0" );
+
+   wait_for { $f->is_ready };
+
+   is_deeply( scalar $f->get,
+              { COMPRESSION => ["snappy"], CQL_VERSION => ["3.0.0"] },
+              '->options->get returns HASH of options' );
+}
+
 done_testing;

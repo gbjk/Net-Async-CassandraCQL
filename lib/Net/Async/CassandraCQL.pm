@@ -14,7 +14,7 @@ our $VERSION = '0.01';
 use base qw( IO::Async::Protocol::Stream );
 
 use Protocol::CassandraCQL qw(
-   OPCODE_ERROR
+   OPCODE_ERROR OPCODE_STARTUP OPCODE_READY
 );
 
 use constant DEFAULT_CQL_PORT => 9042;
@@ -86,6 +86,9 @@ frame.
 
   ( $reply_opcode, $reply_frame ) = $f->get
 
+This is a low-level method; applications should instead use one of the wrapper
+methods below.
+
 =cut
 
 sub send_message
@@ -112,6 +115,27 @@ sub send_message
    return $streams->[$id] = $self->loop->new_future;
 }
 
+=head2 $f = $cass->startup
+
+Sends a C<OPCODE_STARTUP> message. On success, the returned Future yields
+nothing.
+
+=cut
+
+sub startup
+{
+   my $self = shift;
+
+   $self->send_message( OPCODE_STARTUP,
+      Protocol::CassandraCQL::Frame->new->pack_string_map( {
+            CQL_VERSION => "3.0.0",
+      } )
+   )->then( sub {
+      my ( $op, $response ) = @_;
+      $op == OPCODE_READY ? Future->new->done : Future->new->die( "Expected OPCODE_READY" )
+   });
+}
+
 =head1 TODO
 
 =over 8
@@ -119,6 +143,10 @@ sub send_message
 =item *
 
 Queue messages if all 127 available stream IDs are already consumed.
+
+=item *
+
+Handle OPCODE_AUTHENTICATE
 
 =back
 

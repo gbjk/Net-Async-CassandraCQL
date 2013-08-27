@@ -13,6 +13,8 @@ our $VERSION = '0.01';
 
 use base qw( IO::Async::Protocol::Stream );
 
+use Carp;
+
 use Protocol::CassandraCQL qw( :opcodes :results );
 use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ResultRows;
@@ -59,16 +61,42 @@ sub configure
 
 =cut
 
+=head2 $f = $cass->connect( %args )
+
+Connects to the Cassandra node an send the C<OPCODE_STARTUP> message. The
+returned Future will yield nothing on success.
+
+Takes the following named arguments:
+
+=over 8
+
+=item host => STRING
+
+=item service => STRING
+
+Optional. Overrides the configured values.
+
+=back
+
+A host name is required, either as a named argument or as a configured value
+on the object. If the service name is missing, the default CQL port will be
+used instead.
+
+=cut
+
 sub connect
 {
    my $self = shift;
    my %args = @_;
 
-   $args{host}    //= $self->{host};
+   $args{host}    //= $self->{host}    or croak "Require 'host'";
    $args{service} //= $self->{service} // DEFAULT_CQL_PORT;
 
-   return $self->{connect_f} ||=
-      $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } );
+   return ( $self->{connect_f} ||=
+      $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } ) )
+      ->and_then( sub {
+         $self->startup
+      });
 }
 
 sub on_read
@@ -150,6 +178,8 @@ sub send_message
 
 Sends a C<OPCODE_STARTUP> message. On success, the returned Future yields
 nothing.
+
+Normally this is not required as the C<connect> method performs it implicitly.
 
 =cut
 

@@ -63,6 +63,15 @@ my %CONSTANTS = (
    TYPE_LIST      => 0x0020,
    TYPE_MAP       => 0x0021,
    TYPE_SET       => 0x0022,
+
+   CONSISTENCY_ANY          => 0x0000,
+   CONSISTENCY_ONE          => 0x0001,
+   CONSISTENCY_TWO          => 0x0002,
+   CONSISTENCY_THREE        => 0x0003,
+   CONSISTENCY_QUORUM       => 0x0004,
+   CONSISTENCY_ALL          => 0x0005,
+   CONSISTENCY_LOCAL_QUORUM => 0x0006,
+   CONSISTENCY_EACH_QUORUM  => 0x0007,
 );
 
 require constant;

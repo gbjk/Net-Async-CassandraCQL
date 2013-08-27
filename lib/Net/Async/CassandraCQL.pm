@@ -56,14 +56,17 @@ sub on_read
    # v1 response
    die sprintf "Unexpected message version %#02x\n", $version if $version != 0x81;
 
+   my $frame = Protocol::CassandraCQL::Frame->new( $body );
+
    # TODO: flags
    if( my $f = $self->{streams}[$streamid] ) {
       if( $opcode == OPCODE_ERROR ) {
-         my ( $err, $message ) = unpack "N n/a*", $body;
-         $f->fail( "OPCODE_ERROR: $message\n", $body, $err );
+         my $err     = $frame->unpack_int;
+         my $message = $frame->unpack_string;
+         $f->fail( "OPCODE_ERROR: $message\n", $err, $frame );
       }
       else {
-         $f->done( $opcode, $body );
+         $f->done( $opcode, $frame );
       }
 
       undef $self->{streams}[$streamid];
@@ -75,19 +78,20 @@ sub on_read
    return 1;
 }
 
-=head2 $f = $cass->send_message( $opcode, $body )
+=head2 $f = $cass->send_message( $opcode, $frame )
 
-Sends a message with the given opcode and body. The returned Future will yield
-the response opcode and body.
+Sends a message with the given opcode and L<Protocol::CassandraCQL::Frame> for
+the message body. The returned Future will yield the response opcode and
+frame.
 
-  ( $reply_opcode, $reply_body ) = $f->get
+  ( $reply_opcode, $reply_frame ) = $f->get
 
 =cut
 
 sub send_message
 {
    my $self = shift;
-   my ( $opcode, $body ) = @_;
+   my ( $opcode, $frame ) = @_;
 
    my $streams = $self->{streams} ||= [];
    my $id;
@@ -102,6 +106,7 @@ sub send_message
 
    my $version = 0x01;
    my $flags   = 0;
+   my $body    = $frame->bytes;
    $self->write( pack "C C C C N a*", $version, $flags, $id, $opcode, length $body, $body );
 
    return $streams->[$id] = $self->loop->new_future;

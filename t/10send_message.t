@@ -28,7 +28,8 @@ $loop->add( $cass );
 
 # Simulate the smallest possible STARTUP/READY exchange
 {
-   my $f = $cass->send_message( 1, pack "n", 0 );
+   my $f = $cass->send_message( 1,
+      Protocol::CassandraCQL::Frame->new->pack_string_list( [] ) );
 
    isa_ok( $f, "Future", '$f isa Future for ->send_message' );
 
@@ -46,21 +47,23 @@ $loop->add( $cass );
    wait_for { $f->is_ready };
 
    ok( $f->is_ready, '$f now ready after server replies' );
-   is_deeply( [ $f->get ], [ 2, "" ],
-              '$f->get returns reply opcode / body' );
+   is( scalar $f->get, 2, '$f->get returns reply opcode' );
+   is( ref +( $f->get )[1], "Protocol::CassandraCQL::Frame", '$f->get [1] is reply Frame' );
 }
 
 # Two in flight
 {
-   my $f1 = $cass->send_message( 3, "ONE" );
-   my $f2 = $cass->send_message( 4, "TWO" );
+   my $f1 = $cass->send_message( 3,
+      Protocol::CassandraCQL::Frame->new->pack_string( "ONE" ) );
+   my $f2 = $cass->send_message( 4,
+      Protocol::CassandraCQL::Frame->new->pack_string( "TWO" ) );
 
    my $stream = "";
-   wait_for_stream { length $stream >= 8+3 + 8+3 } $S2 => $stream;
+   wait_for_stream { length $stream >= 8+5 + 8+5 } $S2 => $stream;
 
    is_hexstr( $stream,
-              "\x01\x00\x01\x03\0\0\0\3ONE" .
-              "\x01\x00\x02\x04\0\0\0\3TWO",
+              "\x01\x00\x01\x03\0\0\0\5\0\3ONE" .
+              "\x01\x00\x02\x04\0\0\0\5\0\3TWO",
               'stream after two concurrent ->send_message calls' );
 
    $S2->syswrite( "\x81\x00\x02\x06\0\0\0\0" );
@@ -79,17 +82,17 @@ $loop->add( $cass );
 
 # Error
 {
-   my $f = $cass->send_message( 5, "BODY" );
+   my $f = $cass->send_message( 5, Protocol::CassandraCQL::Frame->new );
 
    my $stream = "";
-   wait_for_stream{ length $stream >= 8 + 4 } $S2 => $stream;
+   wait_for_stream{ length $stream >= 8 } $S2 => $stream;
 
    $S2->syswrite( "\x81\x00\x01\x00\0\0\0\x0a\0\0\0\0\0\4Bad!" );
 
    wait_for { $f->is_ready };
 
    ok( $f->failure, '$f has failed' );
-   is_deeply( [ $f->failure ], [ "OPCODE_ERROR: Bad!\n", "\0\0\0\0\0\4Bad!", 0 ],
+   is_deeply( [ $f->failure ], [ "OPCODE_ERROR: Bad!\n", 0, Protocol::CassandraCQL::Frame->new ],
               '$f->failure' );
 }
 

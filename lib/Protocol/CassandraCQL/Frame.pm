@@ -100,6 +100,18 @@ sub pack_lstring { $_[0]->pack_int( length $_[1] );
 sub unpack_lstring { my $l = $_[0]->unpack_int;
                      substr ${$_[0]}, 0, $l, "" }
 
+=head2 $frame->pack_uuid( $v )
+
+=head2 $frame->unpack_uuid
+
+Add or remove a UUID as a plain 16-byte raw scalar
+
+=cut
+
+sub pack_uuid { ${$_[0]} .= pack "a16", $_[1];
+                $_[0] }
+sub unpack_uuid { substr ${$_[0]}, 0, 16, "" }
+
 =head2 $frame->pack_string_list( $v )
 
 =head2 $v = $frame->unpack_string_list

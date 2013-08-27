@@ -53,6 +53,16 @@ is( Protocol::CassandraCQL::Frame->new->bytes, "", '->bytes empty' );
    is( $frame->unpack_lstring, "hello", '->unpack_string' );
 }
 
+# UUID
+{
+   my $frame = Protocol::CassandraCQL::Frame->new;
+   $frame->pack_uuid( "X"x16 );
+   is_hexstr( $frame->bytes, "X"x16, '->pack_uuid' );
+
+   $frame = Protocol::CassandraCQL::Frame->new( $frame->bytes );
+   is( $frame->unpack_uuid, "X"x16, '->unpack_uuid' );
+}
+
 # string list
 {
    my $frame = Protocol::CassandraCQL::Frame->new;

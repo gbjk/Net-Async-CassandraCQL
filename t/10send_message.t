@@ -12,6 +12,7 @@ use IO::Async::Loop;
 use IO::Async::Stream;
 
 use Net::Async::CassandraCQL;
+use Protocol::CassandraCQL::Frame;
 
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );

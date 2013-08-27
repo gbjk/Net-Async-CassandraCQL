@@ -6,7 +6,7 @@ use warnings;
 use Test::More;
 use Test::HexString;
 
-use Protocol::CassandraCQL;
+use Protocol::CassandraCQL::Frame;
 
 # Empty
 is( Protocol::CassandraCQL::Frame->new->bytes, "", '->bytes empty' );

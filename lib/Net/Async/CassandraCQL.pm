@@ -16,6 +16,7 @@ use base qw( IO::Async::Protocol::Stream );
 use Protocol::CassandraCQL qw(
    OPCODE_ERROR OPCODE_STARTUP OPCODE_READY OPCODE_OPTIONS OPCODE_SUPPORTED
 );
+use Protocol::CassandraCQL::Frame;
 
 use constant DEFAULT_CQL_PORT => 9042;
 

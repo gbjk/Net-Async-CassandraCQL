@@ -132,7 +132,9 @@ sub startup
       } )
    )->then( sub {
       my ( $op, $response ) = @_;
-      $op == OPCODE_READY ? Future->new->done : Future->new->die( "Expected OPCODE_READY" )
+      $op == OPCODE_READY or die "Expected OPCODE_READY";
+
+      return Future->new->done;
    });
 }
 
@@ -152,18 +154,15 @@ sub options
       Protocol::CassandraCQL::Frame->new
    )->then( sub {
       my ( $op, $response ) = @_;
-      if( $op == OPCODE_SUPPORTED ) {
-         my %opts;
-         # $response contains a multimap; short * { string, string list }
-         foreach ( 1 .. $response->unpack_short ) {
-            my $name = $response->unpack_string;
-            $opts{$name} = $response->unpack_string_list;
-         }
-         return Future->new->done( \%opts );
+      $op == OPCODE_SUPPORTED or die "Expected OPCODE_SUPPORTED";
+
+      my %opts;
+      # $response contains a multimap; short * { string, string list }
+      foreach ( 1 .. $response->unpack_short ) {
+         my $name = $response->unpack_string;
+         $opts{$name} = $response->unpack_string_list;
       }
-      else {
-         return Future->new->die( "Expected OPCODE_SUPPORTED" );
-      }
+      return Future->new->done( \%opts );
    });
 }
 

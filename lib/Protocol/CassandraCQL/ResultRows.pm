@@ -7,6 +7,7 @@ package Protocol::CassandraCQL::ResultRows;
 
 use strict;
 use warnings;
+use base qw( Protocol::CassandraCQL::ResultMeta );
 
 our $VERSION = '0.01';
 
@@ -15,6 +16,10 @@ use Protocol::CassandraCQL qw( :types );
 =head1 NAME
 
 C<Protocol::CassandraCQL::ResultRows> - stores the result of a Cassandra CQL query
+
+=head1 DESCRIPTION
+
+This is a subclass of L<Protocol::CassandraCQL::ResultMeta>.
 
 =cut
 
@@ -31,10 +36,7 @@ sub new
 {
    my $class = shift;
    my ( $frame ) = @_;
-
-   my $self = bless {}, $class;
-
-   $self->_unpack_metadata( $frame );
+   my $self = $class->SUPER::new( $frame );
 
    my $n_rows = $frame->unpack_int;
    my $n_columns = scalar @{$self->{columns}};
@@ -43,86 +45,6 @@ sub new
    }
 
    return $self;
-}
-
-sub _unpack_metadata
-{
-   my $self = shift;
-   my ( $frame ) = @_;
-
-   my $flags     = $frame->unpack_int;
-   my $n_columns = $frame->unpack_int;
-
-   my $has_gts = $flags & 0x0001;
-   my @gts = $has_gts ? ( $frame->unpack_string, $frame->unpack_string )
-                      : ();
-
-   foreach ( 1 .. $n_columns ) {
-      my @keyspace_table = $has_gts ? @gts : ( $frame->unpack_string, $frame->unpack_string );
-      my $colname        = $frame->unpack_string;
-
-      my $typeid = $frame->unpack_short;
-      my @col = ( @keyspace_table, $colname, $typeid );
-
-      if( $typeid == TYPE_CUSTOM ) {
-         push @col, $frame->unpack_string;
-      }
-
-      push @{$self->{columns}}, \@col;
-   }
-}
-
-=head1 METHODS
-
-=cut
-
-=head2 $n = $result->columns
-
-Returns the number of columns
-
-=cut
-
-sub columns
-{
-   my $self = shift;
-   return scalar @{ $self->{columns} };
-}
-
-=head2 $name = $result->column_name( $idx )
-
-=head2 ( $keyspace, $table, $column ) = $result->column_name( $idx )
-
-Returns the name of the column at the given (0-based) index; either as three
-separate strings, or all joined by ".".
-
-=cut
-
-sub column_name
-{
-   my $self = shift;
-   my ( $idx ) = @_;
-
-   my @n = @{ $self->{columns}[$idx] }[0..2];
-
-   return @n if wantarray;
-   return join ".", @n;
-}
-
-=head2 $type = $result->column_type( $idx )
-
-Returns the type name of the column at the given index.
-
-=cut
-
-sub column_type
-{
-   my $self = shift;
-   my ( $idx ) = @_;
-
-   my ( $typeid, $custom ) = @{ $self->{columns}[$idx] }[3,4];
-   return $custom if $typeid == TYPE_CUSTOM;
-
-   return Protocol::CassandraCQL::typename( $typeid );
 }
 
 =head2 $n = $result->rows

@@ -13,10 +13,9 @@ our $VERSION = '0.01';
 
 use base qw( IO::Async::Protocol::Stream );
 
-use Protocol::CassandraCQL qw(
-   OPCODE_ERROR OPCODE_STARTUP OPCODE_READY OPCODE_OPTIONS OPCODE_SUPPORTED
-);
+use Protocol::CassandraCQL qw( :opcodes :results );
 use Protocol::CassandraCQL::Frame;
+use Protocol::CassandraCQL::ResultRows;
 
 use constant DEFAULT_CQL_PORT => 9042;
 
@@ -164,6 +163,59 @@ sub options
          $opts{$name} = $response->unpack_string_list;
       }
       return Future->new->done( \%opts );
+   });
+}
+
+=head2 $f = $cass->query( $cql, $consistency )
+
+Sends a C<OPCODE_QUERY> message. On success, the values returned from the
+Future will depend on the type of response.
+
+ ( $type, $result ) = $f->get
+
+For type C<keyspace>, C<$result> is a string giving the name of the new
+keyspace (returned from C<USE> queries).
+
+For type C<schema_change>, C<$result> is a 3-element ARRAY reference
+containing the type of change, the keyspace and the table name (returned from
+C<CREATE>, C<ALTER> and C<DROP> queries).
+
+For type C<rows>, C<$result> is an instance of
+L<Protocol::CassandraCQL::ResultRows>.
+
+For void-returning queries such as C<INSERT>, the future returns nothing.
+
+=cut
+
+sub query
+{
+   my $self = shift;
+   my ( $cql, $consistency ) = @_;
+
+   $self->send_message( OPCODE_QUERY,
+      Protocol::CassandraCQL::Frame->new->pack_lstring( $cql )
+                                        ->pack_short( $consistency )
+   )->then( sub {
+      my ( $op, $response ) = @_;
+      $op == OPCODE_RESULT or die "Expected OPCODE_RESULT";
+
+      my $result = $response->unpack_int;
+
+      if( $result == RESULT_VOID ) {
+         return Future->new->done();
+      }
+      elsif( $result == RESULT_ROWS ) {
+         return Future->new->done( rows => Protocol::CassandraCQL::ResultRows->new( $response ) );
+      }
+      elsif( $result == RESULT_SET_KEYSPACE ) {
+         return Future->new->done( keyspace => $response->unpack_string );
+      }
+      elsif( $result == RESULT_SCHEMA_CHANGE ) {
+         return Future->new->done( schema_change => [ map { $response->unpack_string } 1 .. 3 ] );
+      }
+      else {
+         return Future->new->done( "??" => $response->bytes );
+      }
    });
 }
 

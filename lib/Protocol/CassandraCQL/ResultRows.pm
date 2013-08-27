@@ -151,6 +151,20 @@ sub rowbytes
    return @{ $self->{rows}[$idx] };
 }
 
+=head1 TODO
+
+=over 8
+
+=item *
+
+Decode column values from byte buffers according to their type. This will
+require some research as the basic protocol doc doesn't explain how that
+works.
+
+=back
+
+=cut
+
 =head1 SPONSORS
 
 This code was paid for by

@@ -25,6 +25,36 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
 =cut
 
+=head1 PARAMETERS
+
+The following named parameters may be passed ot C<new> or C<configure>:
+
+=over 8
+
+=item host => STRING
+
+The hostname of the Cassandra node to connect to
+
+=item service => STRING
+
+Optional. The service name or port number to connect to.
+
+=back
+
+=cut
+
+sub configure
+{
+   my $self = shift;
+   my %params = @_;
+
+   foreach (qw( host service )) {
+      $self->{$_} = delete $params{$_} if exists $params{$_};
+   }
+
+   $self->SUPER::configure( %params );
+}
+
 =head1 METHODS
 
 =cut
@@ -34,7 +64,8 @@ sub connect
    my $self = shift;
    my %args = @_;
 
-   $args{service} //= DEFAULT_CQL_PORT;
+   $args{host}    //= $self->{host};
+   $args{service} //= $self->{service} // DEFAULT_CQL_PORT;
 
    return $self->{connect_f} ||=
       $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } );
@@ -230,6 +261,11 @@ Queue messages if all 127 available stream IDs are already consumed.
 =item *
 
 Handle OPCODE_AUTHENTICATE
+
+=item *
+
+Allow storing multiple Cassandra node hostnames and perform some kind of
+balancing or failover of connections.
 
 =back
 

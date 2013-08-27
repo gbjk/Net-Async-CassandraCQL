@@ -11,3 +11,4 @@ Build
 _build
 LICENSE
 README
+t/local.yaml

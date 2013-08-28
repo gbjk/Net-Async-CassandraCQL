@@ -63,12 +63,15 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
 =head1 DESCRIPTION
 
-This module allows use of the C<CQL> interface of a Cassandra database. It
+This module allows use of the C<CQLv3> interface of a Cassandra database. It
 fully supports asynchronous operation via L<IO::Async>, allowing both direct
-queries and prepared statements to be managed.
+queries and prepared statements to be managed concurrently, if required.
+Alternatively, as the interface is entirely based on L<Future> objects, it can
+be operated synchronously in a blocking fashion by simply awaiting each
+individual operation by calling the C<get> method.
 
 It is based on L<Protocol::CassandraCQL>, which more completely documents the
-behaviours, and limits of its ability to communicate with Cassandra.
+behaviours and limits of its ability to communicate with Cassandra.
 
 =cut
 
@@ -288,8 +291,8 @@ sub _send
 
 =head2 $f = $cass->startup
 
-Sends a C<OPCODE_STARTUP> message. On success, the returned Future yields
-nothing.
+Sends the initial connection setup message. On success, the returned Future
+yields nothing.
 
 Normally this is not required as the C<connect> method performs it implicitly.
 
@@ -313,9 +316,9 @@ sub startup
 
 =head2 $f = $cass->options
 
-Sends a C<OPCODE_OPTIONS> message. On success, the returned Future yields a
-HASH reference mapping option names to ARRAY references containing valid
-values.
+Requests the list of supported options from the server node. On success, the
+returned Future yields a HASH reference mapping option names to ARRAY
+references containing valid values.
 
 =cut
 
@@ -341,22 +344,23 @@ sub options
 
 =head2 $f = $cass->query( $cql, $consistency )
 
-Sends a C<OPCODE_QUERY> message. On success, the values returned from the
-Future will depend on the type of response.
+Performs a CQL query. On success, the values returned from the Future will
+depend on the type of query.
 
  ( $type, $result ) = $f->get
 
-For type C<keyspace>, C<$result> is a string giving the name of the new
-keyspace (returned from C<USE> queries).
+For C<USE> queries, the type is C<keyspace> and C<$result> is a string giving
+the name of the new keyspace.
 
-For type C<schema_change>, C<$result> is a 3-element ARRAY reference
-containing the type of change, the keyspace and the table name (returned from
-C<CREATE>, C<ALTER> and C<DROP> queries).
+For C<CREATE>, C<ALTER> and C<DROP> queries, the type is C<schema_change> and
+C<$result> is a 3-element ARRAY reference containing the type of change, the
+keyspace and the table name.
 
-For type C<rows>, C<$result> is an instance of
-L<Protocol::CassandraCQL::Result>.
+For C<SELECT> queries, the type is C<rows> and C<$result> is an instance of
+L<Protocol::CassandraCQL::Result> containing the returned row data.
 
-For void-returning queries such as C<INSERT>, the future returns nothing.
+For other queries, such as C<INSERT>, C<UPDATE> and C<DELETE>, the future
+returns nothing.
 
 =cut
 
@@ -377,8 +381,8 @@ sub query
 
 =head2 $f = $cass->prepare( $cql )
 
-Sends a C<OPCODE_PREPARE> message. On success, the returned Future yields an
-instance of a prepared query object (see below).
+Prepares a CQL query for later execution. On success, the returned Future
+yields an instance of a prepared query object (see below).
 
  ( $query ) = $f->get
 
@@ -403,9 +407,13 @@ sub prepare
 
 =head2 $f = $cass->execute( $id, $data, $consistency )
 
-Sends a C<OPCODE_EXECUTE> message to execute a previously-prepared statement.
+Executes a previously-prepared statement, given its ID and the binding data.
 On success, the returned Future will yield results of the same form as the
 C<query> method. C<$data> should contain a list of encoded byte-string values.
+
+Normally this method is not directly required - instead, use the C<execute>
+method on the query object itself, as this will encode the parameters
+correctly.
 
 =cut
 

@@ -354,12 +354,27 @@ Queue messages if all 127 available stream IDs are already consumed.
 
 =item *
 
-Handle OPCODE_AUTHENTICATE
+Handle OPCODE_AUTHENTICATE and OPCODE_REGISTER
 
 =item *
 
 Allow storing multiple Cassandra node hostnames and perform some kind of
 balancing or failover of connections.
+
+=item *
+
+Decode raw bytestrings in query results; encode to raw bytestrings from
+prepared statements.
+
+=item *
+
+Wrap prepared statements in a higher-level object that stores ID and meta
+directly, allowing encoding of data.
+
+=item *
+
+Allow fetching row data as list or HASH of column names; allow executing
+prepared from list or HASH too.
 
 =back
 

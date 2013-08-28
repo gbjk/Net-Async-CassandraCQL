@@ -247,6 +247,24 @@ sub decode_VARINT {
 
 # TODO: INET
 
+=head1 TODO
+
+=over 8
+
+=item *
+
+Reimplement L<Protocol::CassandraCQL::Frame> in XS code for better
+performance.
+
+=item *
+
+Use something faster than dynamic method dispatch for C<encode()> and
+C<decode()>.
+
+=back
+
+=cut
+
 =head1 SPONSORS
 
 This code was paid for by

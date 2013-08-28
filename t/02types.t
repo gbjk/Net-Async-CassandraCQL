@@ -6,6 +6,7 @@ use utf8;
 
 use Test::More;
 use Test::HexString;
+use Math::BigInt;
 
 use Protocol::CassandraCQL;
 BEGIN {
@@ -44,5 +45,27 @@ is       ( decode( TIMESTAMP => "\x00\x00\x01\x40\xc4\x80\x5b\x28" ), 1377686281
 
 is_hexstr( encode( VARCHAR => "café" ), "caf\xc3\xa9", 'encode VARCHAR' );
 is       ( decode( VARCHAR => "caf\xc3\xa9" ), "café", 'decode VARCHAR' );
+
+is_hexstr( encode( VARINT => 123456 ), "\x01\xe2\x40", 'encode VARINT +ve small' );
+is       ( decode( VARINT => "\x01\xe2\x40" ), 123456, 'decode VARINT +ve small' );
+is_hexstr( encode( VARINT => -123 ), "\x85", 'encode VARINT -ve' );
+is       ( decode( VARINT => "\x85" ), -123, 'decode VARINT -ve' );
+
+is_hexstr( encode( VARINT => Math::BigInt->new("1234567890987654321") ), "\x11\x22\x10\xf4\xb1\x6c\x1c\xb1", 'encode VARCHAR +ve large' );
+is       ( decode( VARINT => "\x11\x22\x10\xf4\xb1\x6c\x1c\xb1" ), "1234567890987654321", 'decode VARCHAR +ve large' );
+
+# boundary cases of VARINT encoding
+{
+   sub test_VARINT {
+      my $n = shift;
+      is( decode( VARINT => encode( VARINT => $n ) ), $n, "encode/decode VARINT $n" );
+   }
+
+   test_VARINT( 0 );
+   test_VARINT( 1 );
+   test_VARINT( -1 );
+   test_VARINT( 0xff ); # test zero-extension in the +ve case
+   test_VARINT( -0xff ); # test sign-extension in the -ve case
+}
 
 done_testing;

@@ -14,6 +14,7 @@ use Exporter 'import';
 our @EXPORT_OK = qw();
 
 use Encode ();
+use Scalar::Util qw( blessed );
 
 =head1 NAME
 
@@ -195,7 +196,40 @@ sub decode_TIMESTAMP { (unpack "Q>", $_[0]) / 1000  }
 
 # TODO: UUID
 
-# TODO: VARINT
+# Arbitrary-precision 2s-complement signed integer
+# Math::BigInt doesn't handle signed, but we can mangle it
+sub encode_VARINT {
+   require Math::BigInt;
+   my $n = blessed $_[0] ? $_[0] : Math::BigInt->new($_[0]); # upgrade to a BigInt
+
+   my $bytes;
+   if( $n < 0 ) {
+      my $hex = substr +(-$n-1)->as_hex, 2;
+      $hex = "0$hex" if length($hex) % 2;
+      $bytes = ~(pack "H*", $hex);
+      # Sign-extend if required to avoid appearing positive
+      $bytes = "\xff$bytes" if unpack( "C", $bytes ) < 0x80;
+   }
+   else {
+      my $hex = substr $n->as_hex, 2; # trim 0x
+      $hex = "0$hex" if length($hex) % 2;
+      $bytes = pack "H*", $hex;
+      # Zero-extend if required to avoid appearing negative
+      $bytes = "\0$bytes" if unpack( "C", $bytes ) >= 0x80;
+   }
+   $bytes;
+}
+
+sub decode_VARINT {
+   require Math::BigInt;
+
+   if( unpack( "C", $_[0] ) >= 0x80 ) {
+      return -Math::BigInt->from_hex( unpack "H*", ~$_[0] ) - 1;
+   }
+   else {
+      return Math::BigInt->from_hex( unpack "H*", $_[0] );
+   }
+}
 
 # TODO: INET
 

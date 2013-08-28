@@ -13,6 +13,8 @@ our $VERSION = '0.01';
 use Exporter 'import';
 our @EXPORT_OK = qw();
 
+use Encode ();
+
 =head1 NAME
 
 C<Protocol::CassandraCQL> - wire protocol support functions for Cassandra CQLv3
@@ -104,6 +106,98 @@ sub typename
    my ( $type ) = @_;
    return $typenames{$type};
 }
+
+=head2 $b = encode( $type, $v )
+
+=head2 $v = decode( $type, $b )
+
+Encode or decode a bytestring for a CQL value of the given type.
+
+=cut
+
+# Method dispatch is kinda slow but easy to maintain
+# TODO: find something faster
+
+sub encode
+{
+   my ( $type, $v ) = @_;
+
+   return undef if !defined $v;
+
+   if( my $code = __PACKAGE__->can( "encode_$type" ) ) {
+      return $code->( $v );
+   }
+   else {
+      warn "Not sure how to encode $type";
+      return $v;
+   }
+}
+
+sub decode
+{
+   my ( $type, $b ) = @_;
+
+   return undef if !defined $b;
+
+   if( my $code = __PACKAGE__->can( "decode_$type" ) ) {
+      return $code->( $b );
+   }
+   else {
+      warn "Not sure how to decode $type";
+      # Fallback to a text-safe hexbytes representation
+      return unpack "H*", $b;
+   }
+}
+
+# Now the codecs
+
+# ASCII-only bytes
+sub encode_ASCII { $_[0] =~ m/^[\x00-\x7f]*$/ or die "Non-ASCII"; $_[0] }
+sub decode_ASCII { $_[0] }
+
+# 64-bit integer
+sub encode_BIGINT { pack   "q>", $_[0] }
+sub decode_BIGINT { unpack "q>", $_[0] }
+
+# blob
+sub encode_BLOB { $_[0] }
+sub decode_BLOB { $_[0] }
+
+# true/false byte
+sub encode_BOOLEAN { pack   "C", !!$_[0] }
+sub decode_BOOLEAN { !!unpack "C", $_[0] }
+
+# counter is a 64-bit integer
+*encode_COUNTER = \&encode_BIGINT;
+*decode_COUNTER = \&decode_BIGINT;
+
+# TODO: DECIMAL
+
+# IEEE double
+sub encode_DOUBLE { pack   "d>", $_[0] }
+sub decode_DOUBLE { unpack "d>", $_[0] }
+
+# IEEE single
+sub encode_FLOAT { pack   "f>", $_[0] }
+sub decode_FLOAT { unpack "f>", $_[0] }
+
+# 32-bit integer
+sub encode_INT { pack   "l>", $_[0] }
+sub decode_INT { unpack "l>", $_[0] }
+
+# 'text' seems to come back as 'varchar' but we'll leave them both aliased
+*encode_VARCHAR = *encode_TEXT = \&Encode::encode_utf8;
+*decode_VARCHAR = *decode_TEXT = \&Encode::decode_utf8;
+
+# miliseconds since UNIX epoch as 64bit uint
+sub encode_TIMESTAMP {  pack   "Q>", ($_[0] * 1000) }
+sub decode_TIMESTAMP { (unpack "Q>", $_[0]) / 1000  }
+
+# TODO: UUID
+
+# TODO: VARINT
+
+# TODO: INET
 
 =head1 SPONSORS
 

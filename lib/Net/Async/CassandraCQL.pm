@@ -46,6 +46,15 @@ Optional. The service name or port number to connect to.
 
 =cut
 
+sub _init
+{
+   my $self = shift;
+   $self->SUPER::_init( @_ );
+
+   $self->{streams} = []; # map [1 .. 127] to Future
+   $self->{pending} = []; # queue of [$opcode, $frame, $f]
+}
+
 sub configure
 {
    my $self = shift;
@@ -154,6 +163,11 @@ sub on_read
       }
 
       undef $self->{streams}[$streamid];
+
+      if( my $next = shift @{ $self->{pending} } ) {
+         my ( $opcode, $frame, $f ) = @$next;
+         $self->_send( $opcode, $streamid, $frame, $f );
+      }
    }
    else {
       print STDERR "Received a message opcode=$opcode for unknown stream $streamid\n";
@@ -180,23 +194,39 @@ sub send_message
    my $self = shift;
    my ( $opcode, $frame ) = @_;
 
+   my $f = $self->loop->new_future;
+
    my $streams = $self->{streams} ||= [];
    my $id;
    foreach ( 1 .. $#$streams ) {
       $id = $_ and last if !defined $streams->[$_];
    }
+
    if( !defined $id ) {
-      die "TODO: Queue" if $#$streams == 127;
+      if( $#$streams == 127 ) {
+         push @{ $self->{pending} }, [ $opcode, $frame, $f ];
+         return $f;
+      }
       $id = @$streams;
       $id = 1 if !$id; # can't use 0
    }
+
+   $self->_send( $opcode, $id, $frame, $f );
+
+   return $f;
+}
+
+sub _send
+{
+   my $self = shift;
+   my ( $opcode, $id, $frame, $f ) = @_;
 
    my $version = 0x01;
    my $flags   = 0;
    my $body    = $frame->bytes;
    $self->write( pack "C C C C N a*", $version, $flags, $id, $opcode, length $body, $body );
 
-   return $streams->[$id] = $self->loop->new_future;
+   $self->{streams}[$id] = $f;
 }
 
 =head2 $f = $cass->startup
@@ -419,10 +449,6 @@ sub execute
 =head1 TODO
 
 =over 8
-
-=item *
-
-Queue messages if all 127 available stream IDs are already consumed.
 
 =item *
 

@@ -19,6 +19,31 @@ use Encode qw( encode_utf8 decode_utf8 );
 
 C<Protocol::CassandraCQL::Frame> - a byte buffer storing the content of a CQL message frame
 
+=head1 DESCRIPTION
+
+This class provides wire-protocol encoding and decoding support for
+constructing and parsing Cassandra CQL message frames. An object represents a
+buffer during construction or parsing.
+
+To construct a message frame, create a new empty object and use the C<pack_*>
+methods to append data to it, before eventually obtaining the actual frame
+bytes using C<bytes>. Each C<pack_*> method returns the frame object, allowing
+them to be easily chained:
+
+ my $bytes = Protocol::CassandraCQL::Frame->new
+    ->pack_short( 123 )
+    ->pack_int( 45678 )
+    ->pack_string( "here is the data" )
+    ->bytes;
+
+To parse a message frame, create a new object from the bytes in the message,
+and use the C<unpack_*> methods to consume the values from it.
+
+ my $frame = Protocol::CassandraCQL::Frame->new( $bytes );
+ my $s   = $frame->unpack_short;
+ my $i   = $frame->unpack_int;
+ my $str = $frame->unpack_string;
+
 =cut
 
 =head1 CONSTRUCTOR

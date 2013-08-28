@@ -20,6 +20,37 @@ use Scalar::Util qw( blessed );
 
 C<Protocol::CassandraCQL> - wire protocol support functions for Cassandra CQLv3
 
+=head1 DESCRIPTION
+
+This module provides the basic constants and other support functions required
+to communicate with a Cassandra database using C<CQLv3>. It is not in itself a
+CQL client; it simply provides the necessary support functions to allow one to
+be written.
+
+For a complete client, see instead L<Net::Async::CassandraCQL>.
+
+=cut
+
+=head1 CONSTANTS
+
+The following families of constants are defined, along with export tags:
+
+=head2 OPCODE_* (:opcodes)
+
+Opcodes used in message frames.
+
+=head2 RESULT_* (:results)
+
+Result codes used in C<OPCODE_RESULT> frames.
+
+=head2 TYPE_* (:types)
+
+Type codes used in C<TYPE_ROWS> and C<TYPE_PREPARED> column metadata.
+
+=head2 CONSISTENCY_* (:consistencies)
+
+Consistency levels used in C<OPCODE_QUERY> and C<OPCODE_EXECUTE> frames.
+
 =cut
 
 # See also

@@ -14,7 +14,19 @@ use Protocol::CassandraCQL qw( :types );
 
 =head1 NAME
 
-C<Protocol::CassandraCQL::ColumnMeta> - stores the column metadata result of a Cassandra CQL query
+C<Protocol::CassandraCQL::ColumnMeta> - stores the column metadata of a Cassandra CQL query
+
+=head1 DESCRIPTION
+
+Objects in this class interpret the column metadata from a message frame
+containing a C<OPCODE_RESULT> response to a query giving C<RESULT_ROWS> or
+C<RESULT_PREPARED>. It provides lookup of column names and type information,
+and provides a convenient accessor to the encoding and decoding support
+functions, allowing encoding of bytestrings from perl data when executing a
+prepared statement, and decoding of bytestrings to perl data when obtaining
+query results.
+
+It is also subclassed as L<Protocol::CassandraCQL::Result>.
 
 =cut
 
@@ -22,8 +34,7 @@ C<Protocol::CassandraCQL::ColumnMeta> - stores the column metadata result of a C
 
 =head2 $meta = Protocol::CassandraCQL::ColumnMeta->new( $frame )
 
-Returns a new result object initialised from the given C<OPCODE_RESULT> /
-C<RESULT_ROWS> or C<RESULT_PREPARED> message frame.
+Returns a new result object initialised from the given message frame.
 
 =cut
 

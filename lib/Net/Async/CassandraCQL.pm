@@ -26,11 +26,55 @@ use constant DEFAULT_CQL_PORT => 9042;
 
 C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQL
 
+=head1 SYNOPSIS
+
+ use IO::Async::Loop;
+ use Net::Async::CassandraCQL;
+ use Protocol::CassandraCQL qw( CONSISTENCY_QUORUM );
+
+ my $loop = IO::Async::Loop->new;
+
+ my $cass = Net::Async::CassandraCQL->new(
+    host => "localhost",
+ );
+ $loop->add( $cass );
+
+
+ $cass->connect->then( sub {
+    $cass->query( "USE my-keyspace;" );
+ })->get;
+
+
+ my @f;
+ foreach my $number ( 1 .. 100 ) {
+    push @f, $cass->query( "INSERT INTO numbers (v) = $number;",
+       CONSISTENCY_QUORUM );
+ }
+ Future->needs_all( @f )->get;
+
+
+ my $get_stmt = $cass->prepare( "SELECT v FROM numbers;" )->get;
+
+ my ( undef, $result ) = $get_stmt->execute( [], CONSISTENCY_QUORUM )->get;
+
+ foreach my $idx ( 0 .. $result->rows - 1 ) {
+    say "We have a number " . $result->row_hash($idx)->{v};
+ }
+
+=head1 DESCRIPTION
+
+This module allows use of the C<CQL> interface of a Cassandra database. It
+fully supports asynchronous operation via L<IO::Async>, allowing both direct
+queries and prepared statements to be managed.
+
+It is based on L<Protocol::CassandraCQL>, which more completely documents the
+behaviours, and limits of its ability to communicate with Cassandra.
+
 =cut
 
 =head1 PARAMETERS
 
-The following named parameters may be passed ot C<new> or C<configure>:
+The following named parameters may be passed to C<new> or C<configure>:
 
 =over 8
 

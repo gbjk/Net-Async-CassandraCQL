@@ -19,7 +19,12 @@ C<Protocol::CassandraCQL::Result> - stores the result of a Cassandra CQL query
 
 =head1 DESCRIPTION
 
-This is a subclass of L<Protocol::CassandraCQL::ColumnMeta>.
+Objects in this class store the result of a direct query or executed prepared
+statement, as returned by an C<OPCODE_RESULT> giving C<RESULT_ROWS>. It allows
+convenient access to the decoded row data.
+
+As a subclass of L<Protocol::CassandraCQL::ColumnMeta> it also provides
+information about column metadata, such as column names and types.
 
 =cut
 

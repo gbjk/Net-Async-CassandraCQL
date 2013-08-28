@@ -111,6 +111,38 @@ sub column_type
    return Protocol::CassandraCQL::typename( $typeid );
 }
 
+=head2 @bytes = $meta->encode_data( @data )
+
+Returns a list of encoded bytestrings from the given data according to the type
+of each column.
+
+=cut
+
+sub encode_data
+{
+   my $self = shift;
+   my @data = @_;
+
+   return map { Protocol::CassandraCQL::encode( $self->column_type( $_ ), $data[$_] ) }
+          0 .. $#data;
+}
+
+=head2 @data = $meta->decode_data( @bytes )
+
+Returns a list of decoded data from the given encoded bytestrings according to
+the type of each column.
+
+=cut
+
+sub decode_data
+{
+   my $self = shift;
+   my @bytes = @_;
+
+   return map { Protocol::CassandraCQL::decode( $self->column_type( $_ ), $bytes[$_] ) }
+          0 .. $#bytes;
+}
+
 =head1 SPONSORS
 
 This code was paid for by

@@ -39,6 +39,11 @@ use Protocol::CassandraCQL::ColumnMeta;
    is( $meta->column_type(1), "INT",    '$meta->column_type(1)' );
    is( $meta->column_type(2), "BIGINT", '$meta->column_type(2)' );
 
+   is( $meta->find_column(            "key" ), 0, '$meta->find_column( "key" )' );
+   is( $meta->find_column(      "table.key" ), 0, '$meta->find_column( "table.key" )' );
+   is( $meta->find_column( "test.table.key" ), 0, '$meta->find_column( "test.table.key" )' );
+   is( $meta->find_column( "unknown" ), undef, '$meta->find_column( "unknown" )' );
+
    my @bytes = $meta->encode_data( "the-key", 123, 456 );
    is_hexstr( $bytes[0], "the-key",              '->encode_data [0]' );
    is_hexstr( $bytes[1], "\0\0\0\x7b",           '->encode_data [1]' );

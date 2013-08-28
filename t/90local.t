@@ -60,6 +60,8 @@ pass( "INSERT INTO tbl" );
    is( $result->column_type(0), "VARCHAR", 'column_type 0' );
    is( $result->column_type(1), "VARCHAR", 'column_type 1' );
 
+   is( $result->find_column( "key" ), 0, 'find_column key' );
+
    is_deeply( $result->row_array(0),
               [ "the-key", "the-value" ],
               'row_array(0)' );

@@ -58,14 +58,21 @@ sub new
    }
 
    # Now fix up the shortnames
-   foreach my $c ( @columns ) {
-      my $name = $c->[2];
-      $c->[3] = $name, next if 1 == grep { $_->[2] eq $name } @columns;
+   foreach my $idx ( 0 .. $#columns ) {
+      my $c = $columns[$idx];
+      my @names;
+
+      my $name = "$c->[0].$c->[1].$c->[2]";
+      push @names, $name;
 
       $name = "$c->[1].$c->[2]";
-      $c->[3] = $name, next if 1 == grep { "$_->[1].$_->[2]" eq $name } @columns;
+      push @names, $name if 1 == grep { "$_->[1].$_->[2]" eq $name } @columns;
 
-      $c->[3] = "$c->[0].$c->[1].$c->[2]";
+      $name = $c->[2];
+      push @names, $name if 1 == grep { $_->[2] eq $name } @columns;
+
+      $c->[3] = $names[-1];
+      $self->{name_to_col}{$_} = $idx for @names;
    }
 
    return $self;
@@ -138,6 +145,22 @@ sub column_type
    return $custom if $typeid == TYPE_CUSTOM;
 
    return Protocol::CassandraCQL::typename( $typeid );
+}
+
+=head2 $idx = $meta->find_column( $name )
+
+Returns the index of the given named column. The name may be given as
+C<keyspace.table.column>, or C<table.column> or C<column> if they are unique
+within the set. Returns C<undef> if no such column exists.
+
+=cut
+
+sub find_column
+{
+   my $self = shift;
+   my ( $name ) = @_;
+
+   return $self->{name_to_col}{$name};
 }
 
 =head2 @bytes = $meta->encode_data( @data )

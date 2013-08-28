@@ -194,7 +194,8 @@ sub on_read
    my $body = substr $$buffref, 0, $bodylen, "";
 
    # v1 response
-   die sprintf "Unexpected message version %#02x\n", $version if $version != 0x81;
+   $version == 0x81 or
+      $self->fail_all_and_close( sprintf "Unexpected message version %#02x\n", $version ), return;
 
    my $frame = Protocol::CassandraCQL::Frame->new( $body );
 
@@ -226,14 +227,35 @@ sub on_read
 sub on_closed
 {
    my $self = shift;
+   $self->fail_all( "Connection closed" );
+}
+
+sub fail_all
+{
+   my $self = shift;
+   my ( $failure ) = @_;
 
    foreach ( @{ $self->{streams} } ) {
-      $_->fail( "Connection closed" ) if $_;
+      $_->fail( $failure ) if $_;
    }
+   @{ $self->{streams} } = ();
 
    foreach ( @{ $self->{pending} } ) {
-      $_->[2]->fail( "Connection closed" );
+      $_->[2]->fail( $failure );
    }
+   @{ $self->{pending} } = ();
+}
+
+sub fail_all_and_close
+{
+   my $self = shift;
+   my ( $failure ) = @_;
+
+   $self->fail_all( $failure );
+
+   $self->close;
+
+   return Future->new->fail( $failure );
 }
 
 =head2 $f = $cass->send_message( $opcode, $frame )
@@ -308,7 +330,7 @@ sub startup
       } )
    )->then( sub {
       my ( $op, $response ) = @_;
-      $op == OPCODE_READY or die "Expected OPCODE_READY";
+      $op == OPCODE_READY or return $self->fail_all_and_close( "Expected OPCODE_READY" );
 
       return Future->new->done;
    });
@@ -330,7 +352,7 @@ sub options
       Protocol::CassandraCQL::Frame->new
    )->then( sub {
       my ( $op, $response ) = @_;
-      $op == OPCODE_SUPPORTED or die "Expected OPCODE_SUPPORTED";
+      $op == OPCODE_SUPPORTED or return Future->new->fail( "Expected OPCODE_SUPPORTED" );
 
       my %opts;
       # $response contains a multimap; short * { string, string list }
@@ -374,7 +396,7 @@ sub query
                                         ->pack_short( $consistency )
    )->then( sub {
       my ( $op, $response ) = @_;
-      $op == OPCODE_RESULT or die "Expected OPCODE_RESULT";
+      $op == OPCODE_RESULT or return Future->new->fail( "Expected OPCODE_RESULT" );
       return _decode_result( $response );
    });
 }
@@ -397,9 +419,9 @@ sub prepare
       Protocol::CassandraCQL::Frame->new->pack_lstring( $cql )
    )->then( sub {
       my ( $op, $response ) = @_;
-      $op == OPCODE_RESULT or die "Expected OPCODE_RESULT";
+      $op == OPCODE_RESULT or return Future->new->fail( "Expected OPCODE_RESULT" );
 
-      $response->unpack_int == RESULT_PREPARED or die "Expected RESULT_PREPARED";
+      $response->unpack_int == RESULT_PREPARED or return Future->new->fail( "Expected RESULT_PREPARED" );
 
       return Future->new->done( Net::Async::CassandraCQL::Query->from_frame( $self, $response ) );
    });
@@ -430,7 +452,7 @@ sub execute
 
    $self->send_message( OPCODE_EXECUTE, $frame )->then( sub {
       my ( $op, $response ) = @_;
-      $op == OPCODE_RESULT or die "Expected OPCODE_RESULT";
+      $op == OPCODE_RESULT or return Future->new->fail( "Expected OPCODE_RESULT" );
       return _decode_result( $response );
    });
 }

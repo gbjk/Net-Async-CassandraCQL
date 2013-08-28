@@ -359,6 +359,10 @@ Handle OPCODE_AUTHENTICATE and OPCODE_REGISTER
 
 =item *
 
+Codecs for TYPE_DECIMAL, TYPE_UUID, TYPE_VARINT, TYPE_INET
+
+=item *
+
 Allow storing multiple Cassandra node hostnames and perform some kind of
 balancing or failover of connections.
 
@@ -370,7 +374,7 @@ directly, allowing encoding of data.
 =item *
 
 Allow fetching row data as list or HASH of column names; allow executing
-prepared from list or HASH too.
+prepared from HASH too.
 
 =back
 

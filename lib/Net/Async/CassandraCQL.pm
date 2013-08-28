@@ -513,10 +513,6 @@ Handle OPCODE_AUTHENTICATE and OPCODE_REGISTER
 
 =item *
 
-Codecs for TYPE_UUID, TYPE_INET
-
-=item *
-
 Support frame compression
 
 =item *

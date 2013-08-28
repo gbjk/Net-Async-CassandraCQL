@@ -292,6 +292,14 @@ performance.
 Use something faster than dynamic method dispatch for C<encode()> and
 C<decode()>.
 
+=item *
+
+Codecs for TYPE_UUID, TYPE_INET
+
+=item *
+
+More robust testing of data types, arguments to methods, etc...
+
 =back
 
 =cut

@@ -10,6 +10,8 @@ use warnings;
 
 our $VERSION = '0.01';
 
+use Encode qw( encode_utf8 decode_utf8 );
+
 # TODO: At least the lower-level methods of this class should be rewritten in
 # efficient XS code
 
@@ -78,12 +80,12 @@ Add or remove a string value.
 
 =cut
 
-# TODO: UTF-8 encoding
-sub pack_string { $_[0]->pack_short( length $_[1] );
-                  ${$_[0]} .= $_[1];
+sub pack_string { my $b = encode_utf8( $_[1] );
+                  $_[0]->pack_short( length $b );
+                  ${$_[0]} .= $b;
                   $_[0] }
 sub unpack_string { my $l = $_[0]->unpack_short;
-                    substr ${$_[0]}, 0, $l, "" }
+                    decode_utf8( substr ${$_[0]}, 0, $l, "" ) }
 
 =head2 $frame->pack_lstring( $v )
 
@@ -93,12 +95,12 @@ Add or remove a long string value.
 
 =cut
 
-# TODO: UTF-8 encoding
-sub pack_lstring { $_[0]->pack_int( length $_[1] );
-                   ${$_[0]} .= $_[1];
+sub pack_lstring { my $b = encode_utf8( $_[1] );
+                   $_[0]->pack_int( length $b );
+                   ${$_[0]} .= $b;
                    $_[0] }
 sub unpack_lstring { my $l = $_[0]->unpack_int;
-                     substr ${$_[0]}, 0, $l, "" }
+                     decode_utf8( substr ${$_[0]}, 0, $l, "" ) }
 
 =head2 $frame->pack_uuid( $v )
 

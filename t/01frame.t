@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use utf8;
 
 use Test::More;
 use Test::HexString;
@@ -37,20 +38,25 @@ is( Protocol::CassandraCQL::Frame->new->bytes, "", '->bytes empty' );
 {
    my $frame = Protocol::CassandraCQL::Frame->new;
    $frame->pack_string( "hello" );
-   is_hexstr( $frame->bytes, "\x00\x05hello", '->pack_string' );
+   $frame->pack_string( "sandviĉon" );
+   is_hexstr( $frame->bytes, "\x00\x05hello\x00\x0asandvi\xc4\x89on", '->pack_string and UTF-8' );
 
    $frame = Protocol::CassandraCQL::Frame->new( $frame->bytes );
    is( $frame->unpack_string, "hello", '->unpack_string' );
+   is( $frame->unpack_string, "sandviĉon", '->unpack_string UTF-8' );
 }
 
 # long string
 {
    my $frame = Protocol::CassandraCQL::Frame->new;
    $frame->pack_lstring( "hello" );
-   is_hexstr( $frame->bytes, "\x00\x00\x00\x05hello", '->pack_string' );
+   $frame->pack_lstring( "sandviĉon" );
+   is_hexstr( $frame->bytes, "\x00\x00\x00\x05hello\x00\x00\x00\x0asandvi\xc4\x89on",
+              '->pack_lstring and UTF-8' );
 
    $frame = Protocol::CassandraCQL::Frame->new( $frame->bytes );
-   is( $frame->unpack_lstring, "hello", '->unpack_string' );
+   is( $frame->unpack_lstring, "hello", '->unpack_lstring' );
+   is( $frame->unpack_lstring, "sandviĉon", '->unpack_lstring UTF-8' );
 }
 
 # UUID

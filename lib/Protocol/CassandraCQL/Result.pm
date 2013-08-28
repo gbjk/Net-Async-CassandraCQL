@@ -63,7 +63,7 @@ sub rows
 
 =head2 @columns = $result->rowbytes( $idx )
 
-Returns a list of the raw byte blobs containing the row's data
+Returns a list of the raw bytestrings containing the row's data
 
 =cut
 
@@ -75,19 +75,19 @@ sub rowbytes
    return @{ $self->{rows}[$idx] };
 }
 
-=head1 TODO
+=head2 $data = $result->row_array( $idx )
 
-=over 8
-
-=item *
-
-Decode column values from byte buffers according to their type. This will
-require some research as the basic protocol doc doesn't explain how that
-works.
-
-=back
+Returns the row's data decoded, as an ARRAY reference
 
 =cut
+
+sub row_array
+{
+   my $self = shift;
+   my ( $idx ) = @_;
+
+   return [ $self->decode_data( $self->rowbytes( $idx ) ) ];
+}
 
 =head1 SPONSORS
 

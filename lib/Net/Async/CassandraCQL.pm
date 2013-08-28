@@ -364,11 +364,6 @@ balancing or failover of connections.
 
 =item *
 
-Decode raw bytestrings in query results; encode to raw bytestrings from
-prepared statements.
-
-=item *
-
 Wrap prepared statements in a higher-level object that stores ID and meta
 directly, allowing encoding of data.
 

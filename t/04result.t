@@ -25,6 +25,10 @@ use Protocol::CassandraCQL::Result;
    is_deeply( [ $result->rowbytes( 0 ) ],
               [ "data" ],
               '$result->rowbytes(0)' );
+
+   is_deeply( $result->row_array( 0 ),
+              [ "data" ],
+              '$result->row(0)' );
 }
 
 # Multiple columns
@@ -38,6 +42,10 @@ use Protocol::CassandraCQL::Result;
    );
 
    is( scalar $result->columns, 2, '$result->columns is 2' );
+
+   is_deeply( $result->row_array( 0 ),
+              [ "aaaa", 100 ],
+              '$result->row(0)' );
 }
 
 done_testing;

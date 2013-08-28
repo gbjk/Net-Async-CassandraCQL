@@ -28,7 +28,11 @@ use Protocol::CassandraCQL::Result;
 
    is_deeply( $result->row_array( 0 ),
               [ "data" ],
-              '$result->row(0)' );
+              '$result->row_array(0)' );
+
+   is_deeply( $result->row_hash( 0 ),
+              { column => "data" },
+              '$result->row_hash(0)' );
 }
 
 # Multiple columns
@@ -45,7 +49,11 @@ use Protocol::CassandraCQL::Result;
 
    is_deeply( $result->row_array( 0 ),
               [ "aaaa", 100 ],
-              '$result->row(0)' );
+              '$result->row_array(0)' );
+
+   is_deeply( $result->row_hash( 0 ),
+              { key => "aaaa", i => 100 },
+              '$result->row_hash(0)' );
 }
 
 done_testing;

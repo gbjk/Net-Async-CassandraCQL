@@ -89,6 +89,22 @@ sub row_array
    return [ $self->decode_data( $self->rowbytes( $idx ) ) ];
 }
 
+=head2 $data = $result->row_hash( $idx )
+
+Returns the row's data decoded, as a HASH reference mapping column short names
+to values.
+
+=cut
+
+sub row_hash
+{
+   my $self = shift;
+   my ( $idx ) = @_;
+
+   my @data = $self->decode_data( $self->rowbytes( $idx ) );
+   return { map { $self->column_shortname( $_ ) => $data[$_] } 0 .. $#data };
+}
+
 =head1 SPONSORS
 
 This code was paid for by

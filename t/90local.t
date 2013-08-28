@@ -63,6 +63,10 @@ pass( "INSERT INTO tbl" );
    is_deeply( $result->row_array(0),
               [ "the-key", "the-value" ],
               'row_array(0)' );
+
+   is_deeply( $result->row_hash(0),
+              { key => "the-key", t1 => "the-value" },
+              'row_hash(0)' );
 }
 
 # INSERT as ->prepare / ->execute

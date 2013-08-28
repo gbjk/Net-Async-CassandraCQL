@@ -107,4 +107,68 @@ pass( "INSERT INTO tbl" );
               'row_array(0) for SELECT prepare/execute' );
 }
 
+# Now test we have the right (de)serialisation form for all the numeric types
+{
+   $cass->query( <<'EOCQL', CONSISTENCY_ONE )->get;
+CREATE TABLE numbers (
+   key text PRIMARY KEY,
+   i int, bi bigint, vi varint,
+   flt float, dbl double, d decimal);
+EOCQL
+   my $table = 1;
+   END { $table and $cass->query( "DROP TABLE numbers;", CONSISTENCY_ONE )->await }
+
+   my %ints = (
+      zero => 0,
+      one  => 1,
+      two  => 2,
+      ten  => 10,
+      minus_one => -1,
+      million => 1_000_000,
+   );
+
+   my $getn_stmt = $cass->prepare( "SELECT * FROM numbers WHERE key = ?;" )->get;
+
+   foreach my $name ( keys %ints ) {
+      my $n = $ints{$name};
+      $cass->query( "INSERT INTO numbers (key, i, bi, vi, flt, dbl, d) VALUES ('$name', $n, $n, $n, $n, $n, $n);", CONSISTENCY_ONE )->get;
+   }
+
+   foreach my $name ( keys %ints ) {
+      my $n = $ints{$name};
+      my ( undef, $result ) = $getn_stmt->execute( { key => $name }, CONSISTENCY_ONE )->get;
+
+      is_deeply( $result->row_hash(0),
+                 { key => $name, map { +$_ => $n } qw( i bi vi flt dbl d ) },
+                 "Number deserialisation for $name" );
+   }
+
+   my %reals = (
+      tenth => 0.1,
+      half  => 0.5,
+      e     => exp(1),
+   );
+
+   foreach my $name ( keys %reals ) {
+      my $n = $reals{$name};
+      $cass->query( "INSERT INTO numbers (key, flt, dbl, d) VALUES ('$name', $n, $n, $n);", CONSISTENCY_ONE )->get;
+   }
+
+   foreach my $name ( keys %reals ) {
+      my $n = $reals{$name};
+      my ( undef, $result ) = $getn_stmt->execute( { key => $name }, CONSISTENCY_ONE )->get;
+
+      # floats aren't digit-wise exact
+      my $row = $result->row_hash(0);
+      is( sprintf( "%.5g", delete $row->{flt} ), sprintf( "%.5g", $n ),
+          "Float deserialisation for $name" );
+
+      is_deeply( $row,
+                 { key => $name,
+                   dbl => $n, d => $n,
+                   i => undef, bi => undef, vi => undef },
+                 "Number deserialisation for $name" );
+   }
+}
+
 done_testing;

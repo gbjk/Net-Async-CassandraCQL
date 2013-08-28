@@ -61,6 +61,30 @@ sub configure
 
 =cut
 
+# function
+sub _decode_result
+{
+   my ( $response ) = @_;
+
+   my $result = $response->unpack_int;
+
+   if( $result == RESULT_VOID ) {
+      return Future->new->done();
+   }
+   elsif( $result == RESULT_ROWS ) {
+      return Future->new->done( rows => Protocol::CassandraCQL::ResultRows->new( $response ) );
+   }
+   elsif( $result == RESULT_SET_KEYSPACE ) {
+      return Future->new->done( keyspace => $response->unpack_string );
+   }
+   elsif( $result == RESULT_SCHEMA_CHANGE ) {
+      return Future->new->done( schema_change => [ map { $response->unpack_string } 1 .. 3 ] );
+   }
+   else {
+      return Future->new->done( "??" => $response->bytes );
+   }
+}
+
 =head2 $f = $cass->connect( %args )
 
 Connects to the Cassandra node an send the C<OPCODE_STARTUP> message. The
@@ -259,24 +283,64 @@ sub query
    )->then( sub {
       my ( $op, $response ) = @_;
       $op == OPCODE_RESULT or die "Expected OPCODE_RESULT";
+      return _decode_result( $response );
+   });
+}
 
-      my $result = $response->unpack_int;
+=head2 $f = $cass->prepare( $cql )
 
-      if( $result == RESULT_VOID ) {
-         return Future->new->done();
-      }
-      elsif( $result == RESULT_ROWS ) {
-         return Future->new->done( rows => Protocol::CassandraCQL::ResultRows->new( $response ) );
-      }
-      elsif( $result == RESULT_SET_KEYSPACE ) {
-         return Future->new->done( keyspace => $response->unpack_string );
-      }
-      elsif( $result == RESULT_SCHEMA_CHANGE ) {
-         return Future->new->done( schema_change => [ map { $response->unpack_string } 1 .. 3 ] );
-      }
-      else {
-         return Future->new->done( "??" => $response->bytes );
-      }
+Sends a C<OPCODE_PREPARE> message. On success, the returned Future yields
+the prepared statement ID and a L<Protocol::CassandraCQL::ResultMeta> instance
+giving the parameter names and types required to execute the query.
+
+ ( $id, $metadata ) = $f->get
+
+=cut
+
+sub prepare
+{
+   my $self = shift;
+   my ( $cql ) = @_;
+
+   $self->send_message( OPCODE_PREPARE,
+      Protocol::CassandraCQL::Frame->new->pack_lstring( $cql )
+   )->then( sub {
+      my ( $op, $response ) = @_;
+      $op == OPCODE_RESULT or die "Expected OPCODE_RESULT";
+
+      $response->unpack_int == RESULT_PREPARED or die "Expected RESULT_PREPARED";
+
+      my $id = $response->unpack_short_bytes;
+
+      my $meta = Protocol::CassandraCQL::ResultMeta->new( $response );
+
+      Future->new->done( $id, $meta );
+   });
+}
+
+=head2 $f = $cass->execute( $id, $data, $consistency )
+
+Sends a C<OPCODE_EXECUTE> message to execute a previously-prepared statement.
+On success, the returned Future will yield results of the same form as the
+C<query> method. C<$data> should contain a list of encoded byte-string values.
+
+=cut
+
+sub execute
+{
+   my $self = shift;
+   my ( $id, $data, $consistency ) = @_;
+
+   my $frame = Protocol::CassandraCQL::Frame->new
+      ->pack_short_bytes( $id )
+      ->pack_short( scalar @$data );
+   $frame->pack_bytes( $_ ) for @$data;
+   $frame->pack_short( $consistency );
+
+   $self->send_message( OPCODE_EXECUTE, $frame )->then( sub {
+      my ( $op, $response ) = @_;
+      $op == OPCODE_RESULT or die "Expected OPCODE_RESULT";
+      return _decode_result( $response );
    });
 }
 

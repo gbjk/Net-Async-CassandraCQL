@@ -118,6 +118,8 @@ $loop->add( $cass );
    is( scalar $f->get, "rows", '->query SELECT returns rows' );
 
    my $result = ( $f->get )[1];
+   is( $result->columns, 2, '$result->columns' );
+   is( $result->rows, 1, '$result->rows' );
 }
 
 # ->query returning set_keyspace
@@ -162,6 +164,49 @@ $loop->add( $cass );
 
    is_deeply( [ $f->get ], [ schema_change => [qw( DROPPED test users )] ],
               '->query DROP TABLE returns schema change' );
+}
+
+# ->prepare
+{
+   my $f = $cass->prepare( "INSERT INTO t (f) = (?);" );
+
+   my $stream = "";
+   wait_for_stream { length $stream >= 8 + 28 } $S2 => $stream;
+
+   # OPCODE_PREPARE
+   is_hexstr( $stream,
+              "\x01\x00\x01\x09\0\0\0\x1c" .
+                 "\0\0\0\x18INSERT INTO t (f) = (?);",
+              'stream after ->prepare' );
+
+   # OPCODE_RESULT
+   $S2->syswrite( "\x81\x00\x01\x08\0\0\0\x2c\0\0\0\4" .
+                     "\x00\x100123456789ABCDEF" .
+                     "\0\0\0\1\0\0\0\1\0\4test\0\1t\0\1f\x00\x0D" );
+
+   wait_for { $f->is_ready };
+
+   my ( $id, $meta ) = $f->get;
+   is( $id, "0123456789ABCDEF", '$id after ->prepare->get' );
+   is( $meta->columns, 1, '$meta->columns' );
+   is( scalar $meta->column_name(0), "test.t.f", '$meta->column_name(0)' );
+   is( $meta->column_type(0), "VARCHAR", '$meta->column_type(0)' );
+}
+
+# ->execute
+{
+   my $f = $cass->execute( "0123456789ABCDEF", [ "more-data" ], CONSISTENCY_ANY );
+
+   my $stream = "";
+   wait_for_stream { length $stream >= 8 + 35 } $S2 => $stream;
+
+   # OPCODE_EXECUTE
+   is_hexstr( $stream,
+              "\x01\x00\x01\x0A\0\0\0\x23" .
+                 "\x00\x100123456789ABCDEF" .
+                 "\x00\x01" . "\0\0\0\x09more-data" .
+                 "\x00\x00",
+              'stream after ->execute' );
 }
 
 done_testing;

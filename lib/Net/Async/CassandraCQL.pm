@@ -57,8 +57,8 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
  my ( undef, $result ) = $get_stmt->execute( [], CONSISTENCY_QUORUM )->get;
 
- foreach my $idx ( 0 .. $result->rows - 1 ) {
-    say "We have a number " . $result->row_hash($idx)->{v};
+ foreach my $row ( $result->rows_hash) {
+    say "We have a number " . $row->{v};
  }
 
 =head1 DESCRIPTION

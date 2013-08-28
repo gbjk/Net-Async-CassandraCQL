@@ -110,6 +110,30 @@ sub row_hash
    return { map { $self->column_shortname( $_ ) => $data[$_] } 0 .. $#data };
 }
 
+=head2 @data = $result->rows_array
+
+Returns a list of all the rows' data decoded as ARRAY references.
+
+=cut
+
+sub rows_array
+{
+   my $self = shift;
+   return map { $self->row_array( $_ ) } 0 .. $self->rows-1;
+}
+
+=head2 @data = $result->rows_hash
+
+Returns a list of all the rows' data decoded as HASH references.
+
+=cut
+
+sub rows_hash
+{
+   my $self = shift;
+   return map { $self->row_hash( $_ ) } 0 .. $self->rows-1;
+}
+
 =head1 SPONSORS
 
 This code was paid for by

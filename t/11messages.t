@@ -186,11 +186,11 @@ $loop->add( $cass );
 
    wait_for { $f->is_ready };
 
-   my ( $id, $meta ) = $f->get;
-   is( $id, "0123456789ABCDEF", '$id after ->prepare->get' );
-   is( $meta->columns, 1, '$meta->columns' );
-   is( scalar $meta->column_name(0), "test.t.f", '$meta->column_name(0)' );
-   is( $meta->column_type(0), "VARCHAR", '$meta->column_type(0)' );
+   my $query = $f->get;
+   is( $query->id, "0123456789ABCDEF", '$query->id after ->prepare->get' );
+   is( $query->columns, 1, '$query->columns' );
+   is( scalar $query->column_name(0), "test.t.f", '$query->column_name(0)' );
+   is( $query->column_type(0), "VARCHAR", '$query->column_type(0)' );
 }
 
 # ->execute

@@ -290,11 +290,10 @@ sub query
 
 =head2 $f = $cass->prepare( $cql )
 
-Sends a C<OPCODE_PREPARE> message. On success, the returned Future yields
-the prepared statement ID and a L<Protocol::CassandraCQL::ColumnMeta> instance
-giving the parameter names and types required to execute the query.
+Sends a C<OPCODE_PREPARE> message. On success, the returned Future yields an
+instance of a prepared query object (see below).
 
- ( $id, $metadata ) = $f->get
+ ( $query ) = $f->get
 
 =cut
 
@@ -311,11 +310,7 @@ sub prepare
 
       $response->unpack_int == RESULT_PREPARED or die "Expected RESULT_PREPARED";
 
-      my $id = $response->unpack_short_bytes;
-
-      my $meta = Protocol::CassandraCQL::ColumnMeta->new( $response );
-
-      Future->new->done( $id, $meta );
+      return Future->new->done( Net::Async::CassandraCQL::Query->new( $self, $response ) );
    });
 }
 
@@ -343,6 +338,66 @@ sub execute
       $op == OPCODE_RESULT or die "Expected OPCODE_RESULT";
       return _decode_result( $response );
    });
+}
+
+package # hide from CPAN
+   Net::Async::CassandraCQL::Query;
+use base qw( Protocol::CassandraCQL::ColumnMeta );
+
+=head1 PREPARED QUERIES
+
+Prepared query objects are returned by C<prepare>, and have the following
+methods, in addition to those of its parent class,
+L<Protocol::CassandraCQL::ColumnMeta>.
+
+=cut
+
+sub new
+{
+   my $class = shift;
+   my ( $cassandra, $response ) = @_;
+
+   my $id = $response->unpack_short_bytes;
+
+   my $self = $class->SUPER::new( $response );
+
+   $self->{cassandra} = $cassandra;
+   $self->{id} = $id;
+
+   return $self;
+}
+
+=head2 $id = $query->id
+
+Returns the query ID.
+
+=cut
+
+sub id
+{
+   my $self = shift;
+   return $self->{id};
+}
+
+=head2 $f = $query->execute( $data, $consistency )
+
+Executes the query on the Cassandra connection object that created it,
+returning a future yielding the result the same way as the C<query> or
+C<execute> methods.
+
+The contents of the C<$data> ARRAY reference will be encoded according to the
+types given in the underlying column metadata.
+
+=cut
+
+sub execute
+{
+   my $self = shift;
+   my ( $data, $consistency ) = @_;
+
+   my @bytes = $self->encode_data( @$data );
+
+   return $self->{cassandra}->execute( $self->id, \@bytes, $consistency );
 }
 
 =head1 TODO

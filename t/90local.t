@@ -71,28 +71,28 @@ pass( "INSERT INTO tbl" );
 
 # INSERT as ->prepare / ->execute
 {
-   my ( $id, $meta ) = $cass->prepare( "INSERT INTO tbl1 (key, i1) VALUES (?, ?);" )->get;
+   my $query = $cass->prepare( "INSERT INTO tbl1 (key, i1) VALUES (?, ?);" )->get;
 
-   ok( length $id, '$id is set for prepared INSERT' );
+   ok( length $query->id, '$query->id is set for prepared INSERT' );
 
-   is( $meta->columns, 2, '$meta has 2 columns for prepared INSERT' );
-   is( scalar $meta->column_name(0), "$CONFIG{keyspace}.tbl1.key", 'column_name 0' );
-   is( scalar $meta->column_name(1), "$CONFIG{keyspace}.tbl1.i1",  'column_name 1' );
-   is( $meta->column_type(0), "VARCHAR", 'column_type 0' );
-   is( $meta->column_type(1), "INT",     'column_type 1' );
+   is( $query->columns, 2, '$query has 2 columns for prepared INSERT' );
+   is( scalar $query->column_name(0), "$CONFIG{keyspace}.tbl1.key", 'column_name 0' );
+   is( scalar $query->column_name(1), "$CONFIG{keyspace}.tbl1.i1",  'column_name 1' );
+   is( $query->column_type(0), "VARCHAR", 'column_type 0' );
+   is( $query->column_type(1), "INT",     'column_type 1' );
 
-   $cass->execute( $id, [ $meta->encode_data( "another-key", 123456789 ) ], CONSISTENCY_ONE )->get;
+   $query->execute( [ "another-key", 123456789 ], CONSISTENCY_ONE )->get;
 }
 
 # SELECT as ->prepare / ->execute
 {
-   my ( $id, $meta ) = $cass->prepare( "SELECT i1 FROM tbl1 WHERE key = ?;" )->get;
+   my $query = $cass->prepare( "SELECT i1 FROM tbl1 WHERE key = ?;" )->get;
 
-   ok( length $id, '$id is set for prepared SELECT' );
+   ok( length $query->id, '$query->id is set for prepared SELECT' );
 
-   is( $meta->columns, 1, '$meta has 1 column for prepared SELECT' );
+   is( $query->columns, 1, '$query has 1 column for prepared SELECT' );
 
-   my ( $type, $result ) = $cass->execute( $id, [ $meta->encode_data( "another-key" ) ], CONSISTENCY_ONE )->get;
+   my ( $type, $result ) = $query->execute( [ "another-key" ], CONSISTENCY_ONE )->get;
 
    is( $type, "rows", 'SELECT prepare/execute result type is rows' );
 

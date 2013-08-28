@@ -437,16 +437,6 @@ Codecs for TYPE_DECIMAL, TYPE_UUID, TYPE_VARINT, TYPE_INET
 Allow storing multiple Cassandra node hostnames and perform some kind of
 balancing or failover of connections.
 
-=item *
-
-Wrap prepared statements in a higher-level object that stores ID and meta
-directly, allowing encoding of data.
-
-=item *
-
-Allow fetching row data as list or HASH of column names; allow executing
-prepared from HASH too.
-
 =back
 
 =cut

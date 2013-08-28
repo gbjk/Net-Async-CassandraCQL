@@ -176,6 +176,19 @@ sub on_read
    return 1;
 }
 
+sub on_closed
+{
+   my $self = shift;
+
+   foreach ( @{ $self->{streams} } ) {
+      $_->fail( "Connection closed" ) if $_;
+   }
+
+   foreach ( @{ $self->{pending} } ) {
+      $_->[2]->fail( "Connection closed" );
+   }
+}
+
 =head2 $f = $cass->send_message( $opcode, $frame )
 
 Sends a message with the given opcode and L<Protocol::CassandraCQL::Frame> for

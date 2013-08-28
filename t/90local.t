@@ -83,7 +83,11 @@ pass( "INSERT INTO tbl" );
    is( $query->column_type(0), "VARCHAR", 'column_type 0' );
    is( $query->column_type(1), "INT",     'column_type 1' );
 
+   # ARRAY
    $query->execute( [ "another-key", 123456789 ], CONSISTENCY_ONE )->get;
+
+   # HASH
+   $query->execute( { key => "second-key", i1 => 987654321 }, CONSISTENCY_ONE )->get;
 }
 
 # SELECT as ->prepare / ->execute

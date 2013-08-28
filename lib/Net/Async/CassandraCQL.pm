@@ -343,6 +343,7 @@ sub execute
 package # hide from CPAN
    Net::Async::CassandraCQL::Query;
 use base qw( Protocol::CassandraCQL::ColumnMeta );
+use Carp;
 
 =head1 PREPARED QUERIES
 
@@ -385,8 +386,9 @@ Executes the query on the Cassandra connection object that created it,
 returning a future yielding the result the same way as the C<query> or
 C<execute> methods.
 
-The contents of the C<$data> ARRAY reference will be encoded according to the
-types given in the underlying column metadata.
+The contents of the C<$data> reference will be encoded according to the types
+given in the underlying column metadata. C<$data> may be given as a positional
+ARRAY reference, or a named HASH reference where the keys give column names.
 
 =cut
 
@@ -395,7 +397,21 @@ sub execute
    my $self = shift;
    my ( $data, $consistency ) = @_;
 
-   my @bytes = $self->encode_data( @$data );
+   my @data;
+   if( ref $data eq "ARRAY" ) {
+      @data = @$data;
+   }
+   elsif( ref $data eq "HASH" ) {
+      @data = ( undef ) x $self->columns;
+      foreach my $name ( keys %$data ) {
+         my $idx = $self->find_column( $name );
+         defined $idx or croak "Unknown bind column name '$name'";
+         defined $data[$idx] and croak "Cannot bind column ".$self->column_name($idx)." twice";
+         $data[$idx] = $data->{$name};
+      }
+   }
+
+   my @bytes = $self->encode_data( @data );
 
    return $self->{cassandra}->execute( $self->id, \@bytes, $consistency );
 }

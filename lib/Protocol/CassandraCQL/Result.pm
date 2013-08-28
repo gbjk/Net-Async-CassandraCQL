@@ -40,6 +40,8 @@ sub new
 
    my $n_rows = $frame->unpack_int;
    my $n_columns = scalar @{$self->{columns}};
+
+   $self->{rows} = [];
    foreach ( 1 .. $n_rows ) {
       push @{$self->{rows}}, [ map { $frame->unpack_bytes } 1 .. $n_columns ];
    }

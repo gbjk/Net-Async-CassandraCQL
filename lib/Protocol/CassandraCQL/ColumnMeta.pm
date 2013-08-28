@@ -34,6 +34,8 @@ sub new
 
    my $self = bless {}, $class;
 
+   $self->{columns} = \my @columns;
+
    my $flags     = $frame->unpack_int;
    my $n_columns = $frame->unpack_int;
 
@@ -46,13 +48,24 @@ sub new
       my $colname        = $frame->unpack_string;
 
       my $typeid = $frame->unpack_short;
-      my @col = ( @keyspace_table, $colname, $typeid );
+      my @col = ( @keyspace_table, $colname, undef, $typeid );
 
       if( $typeid == TYPE_CUSTOM ) {
          push @col, $frame->unpack_string;
       }
 
-      push @{$self->{columns}}, \@col;
+      push @columns, \@col;
+   }
+
+   # Now fix up the shortnames
+   foreach my $c ( @columns ) {
+      my $name = $c->[2];
+      $c->[3] = $name, next if 1 == grep { $_->[2] eq $name } @columns;
+
+      $name = "$c->[1].$c->[2]";
+      $c->[3] = $name, next if 1 == grep { "$_->[1].$_->[2]" eq $name } @columns;
+
+      $c->[3] = "$c->[0].$c->[1].$c->[2]";
    }
 
    return $self;
@@ -94,6 +107,22 @@ sub column_name
    return join ".", @n;
 }
 
+=head2 $name = $meta->column_shortname( $idx )
+
+Returns the short name of the column; which will be just the column name
+unless it requires the table or keyspace name as well to make it unique within
+the set.
+
+=cut
+
+sub column_shortname
+{
+   my $self = shift;
+   my ( $idx ) = @_;
+
+   return $self->{columns}[$idx][3];
+}
+
 =head2 $type = $meta->column_type( $idx )
 
 Returns the type name of the column at the given index.
@@ -105,7 +134,7 @@ sub column_type
    my $self = shift;
    my ( $idx ) = @_;
 
-   my ( $typeid, $custom ) = @{ $self->{columns}[$idx] }[3,4];
+   my ( $typeid, $custom ) = @{ $self->{columns}[$idx] }[4,5];
    return $custom if $typeid == TYPE_CUSTOM;
 
    return Protocol::CassandraCQL::typename( $typeid );

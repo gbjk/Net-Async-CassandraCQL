@@ -31,6 +31,10 @@ use Protocol::CassandraCQL::ColumnMeta;
               [qw( test table b )],
               '$meta->column_name(2) list' );
 
+   is( $meta->column_shortname( 0 ), "key", '$meta->column_shortname(0)' );
+   is( $meta->column_shortname( 1 ), "i",   '$meta->column_shortname(1)' );
+   is( $meta->column_shortname( 2 ), "b",   '$meta->column_shortname(2)' );
+
    is( $meta->column_type(0), "TEXT",   '$meta->column_type(0)' );
    is( $meta->column_type(1), "INT",    '$meta->column_type(1)' );
    is( $meta->column_type(2), "BIGINT", '$meta->column_type(2)' );

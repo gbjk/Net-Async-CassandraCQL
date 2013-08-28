@@ -3,7 +3,7 @@
 #
 #  (C) Paul Evans, 2013 -- leonerd@leonerd.org.uk
 
-package Protocol::CassandraCQL::ResultMeta;
+package Protocol::CassandraCQL::ColumnMeta;
 
 use strict;
 use warnings;
@@ -14,13 +14,13 @@ use Protocol::CassandraCQL qw( :types );
 
 =head1 NAME
 
-C<Protocol::CassandraCQL::ResultMeta> - stores the column metadata result of a Cassandra CQL query
+C<Protocol::CassandraCQL::ColumnMeta> - stores the column metadata result of a Cassandra CQL query
 
 =cut
 
 =head1 CONSTRUCTOR
 
-=head2 $meta = Protocol::CassandraCQL::ResultMeta->new( $frame )
+=head2 $meta = Protocol::CassandraCQL::ColumnMeta->new( $frame )
 
 Returns a new result object initialised from the given C<OPCODE_RESULT> /
 C<RESULT_ROWS> or C<RESULT_PREPARED> message frame.

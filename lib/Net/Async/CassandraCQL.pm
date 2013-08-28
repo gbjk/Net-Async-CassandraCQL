@@ -17,7 +17,8 @@ use Carp;
 
 use Protocol::CassandraCQL qw( :opcodes :results );
 use Protocol::CassandraCQL::Frame;
-use Protocol::CassandraCQL::ResultRows;
+use Protocol::CassandraCQL::ColumnMeta;
+use Protocol::CassandraCQL::Result;
 
 use constant DEFAULT_CQL_PORT => 9042;
 
@@ -72,7 +73,7 @@ sub _decode_result
       return Future->new->done();
    }
    elsif( $result == RESULT_ROWS ) {
-      return Future->new->done( rows => Protocol::CassandraCQL::ResultRows->new( $response ) );
+      return Future->new->done( rows => Protocol::CassandraCQL::Result->new( $response ) );
    }
    elsif( $result == RESULT_SET_KEYSPACE ) {
       return Future->new->done( keyspace => $response->unpack_string );
@@ -266,7 +267,7 @@ containing the type of change, the keyspace and the table name (returned from
 C<CREATE>, C<ALTER> and C<DROP> queries).
 
 For type C<rows>, C<$result> is an instance of
-L<Protocol::CassandraCQL::ResultRows>.
+L<Protocol::CassandraCQL::Result>.
 
 For void-returning queries such as C<INSERT>, the future returns nothing.
 
@@ -290,7 +291,7 @@ sub query
 =head2 $f = $cass->prepare( $cql )
 
 Sends a C<OPCODE_PREPARE> message. On success, the returned Future yields
-the prepared statement ID and a L<Protocol::CassandraCQL::ResultMeta> instance
+the prepared statement ID and a L<Protocol::CassandraCQL::ColumnMeta> instance
 giving the parameter names and types required to execute the query.
 
  ( $id, $metadata ) = $f->get
@@ -312,7 +313,7 @@ sub prepare
 
       my $id = $response->unpack_short_bytes;
 
-      my $meta = Protocol::CassandraCQL::ResultMeta->new( $response );
+      my $meta = Protocol::CassandraCQL::ColumnMeta->new( $response );
 
       Future->new->done( $id, $meta );
    });

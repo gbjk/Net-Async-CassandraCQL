@@ -6,11 +6,11 @@ use warnings;
 use Test::More;
 
 use Protocol::CassandraCQL::Frame;
-use Protocol::CassandraCQL::ResultRows;
+use Protocol::CassandraCQL::Result;
 
 # Single column/row
 {
-   my $result = Protocol::CassandraCQL::ResultRows->new(
+   my $result = Protocol::CassandraCQL::Result->new(
       Protocol::CassandraCQL::Frame->new(
          "\0\0\0\1\0\0\0\1\0\4test\0\5table\0\6column\0\x0a" . # metadata
          "\0\0\0\1" .   # row count

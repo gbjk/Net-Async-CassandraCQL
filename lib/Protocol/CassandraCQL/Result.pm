@@ -3,11 +3,11 @@
 #
 #  (C) Paul Evans, 2013 -- leonerd@leonerd.org.uk
 
-package Protocol::CassandraCQL::ResultRows;
+package Protocol::CassandraCQL::Result;
 
 use strict;
 use warnings;
-use base qw( Protocol::CassandraCQL::ResultMeta );
+use base qw( Protocol::CassandraCQL::ColumnMeta );
 
 our $VERSION = '0.01';
 
@@ -15,17 +15,17 @@ use Protocol::CassandraCQL qw( :types );
 
 =head1 NAME
 
-C<Protocol::CassandraCQL::ResultRows> - stores the result of a Cassandra CQL query
+C<Protocol::CassandraCQL::Result> - stores the result of a Cassandra CQL query
 
 =head1 DESCRIPTION
 
-This is a subclass of L<Protocol::CassandraCQL::ResultMeta>.
+This is a subclass of L<Protocol::CassandraCQL::ColumnMeta>.
 
 =cut
 
 =head1 CONSTRUCTOR
 
-=head2 $result = Protocol::CassandraCQL::ResultRows->new( $frame )
+=head2 $result = Protocol::CassandraCQL::Result->new( $frame )
 
 Returns a new result object initialised from the given C<OPCODE_RESULT> /
 C<RESULT_ROWS> message frame.

@@ -47,7 +47,7 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
  my @f;
  foreach my $number ( 1 .. 100 ) {
-    push @f, $cass->query( "INSERT INTO numbers (v) = $number;",
+    push @f, $cass->query( "INSERT INTO numbers (v) VALUES $number;",
        CONSISTENCY_QUORUM );
  }
  Future->needs_all( @f )->get;

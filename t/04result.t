@@ -10,7 +10,7 @@ use Protocol::CassandraCQL::Result;
 
 # Single column/row
 {
-   my $result = Protocol::CassandraCQL::Result->new(
+   my $result = Protocol::CassandraCQL::Result->from_frame(
       Protocol::CassandraCQL::Frame->new(
          "\0\0\0\1\0\0\0\1\0\4test\0\5table\0\6column\0\x0a" . # metadata
          "\0\0\0\1" .   # row count
@@ -37,7 +37,7 @@ use Protocol::CassandraCQL::Result;
 
 # Multiple columns
 {
-   my $result = Protocol::CassandraCQL::Result->new(
+   my $result = Protocol::CassandraCQL::Result->from_frame(
       Protocol::CassandraCQL::Frame->new(
          "\0\0\0\1\0\0\0\2\0\4test\0\5table\0\3key\0\x0a\0\1i\0\x09" . # metadata
          "\0\0\0\1" .   # row count

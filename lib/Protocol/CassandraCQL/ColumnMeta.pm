@@ -32,13 +32,13 @@ It is also subclassed as L<Protocol::CassandraCQL::Result>.
 
 =head1 CONSTRUCTOR
 
-=head2 $meta = Protocol::CassandraCQL::ColumnMeta->new( $frame )
+=head2 $meta = Protocol::CassandraCQL::ColumnMeta->from_frame( $frame )
 
 Returns a new result object initialised from the given message frame.
 
 =cut
 
-sub new
+sub from_frame
 {
    my $class = shift;
    my ( $frame ) = @_;

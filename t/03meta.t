@@ -10,7 +10,7 @@ use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ColumnMeta;
 
 {
-   my $meta = Protocol::CassandraCQL::ColumnMeta->new(
+   my $meta = Protocol::CassandraCQL::ColumnMeta->from_frame(
       Protocol::CassandraCQL::Frame->new(
          "\0\0\0\1\0\0\0\3\0\4test\0\5table\0\3key\0\x0a\0\1i\0\x09\0\1b\0\x02"
       )

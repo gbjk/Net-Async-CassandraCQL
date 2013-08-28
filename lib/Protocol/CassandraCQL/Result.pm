@@ -30,18 +30,18 @@ information about column metadata, such as column names and types.
 
 =head1 CONSTRUCTOR
 
-=head2 $result = Protocol::CassandraCQL::Result->new( $frame )
+=head2 $result = Protocol::CassandraCQL::Result->from_frame( $frame )
 
 Returns a new result object initialised from the given C<OPCODE_RESULT> /
 C<RESULT_ROWS> message frame.
 
 =cut
 
-sub new
+sub from_frame
 {
    my $class = shift;
    my ( $frame ) = @_;
-   my $self = $class->SUPER::new( $frame );
+   my $self = $class->SUPER::from_frame( $frame );
 
    my $n_rows = $frame->unpack_int;
    my $n_columns = scalar @{$self->{columns}};

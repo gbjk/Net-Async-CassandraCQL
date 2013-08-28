@@ -126,7 +126,7 @@ sub _decode_result
       return Future->new->done();
    }
    elsif( $result == RESULT_ROWS ) {
-      return Future->new->done( rows => Protocol::CassandraCQL::Result->new( $response ) );
+      return Future->new->done( rows => Protocol::CassandraCQL::Result->from_frame( $response ) );
    }
    elsif( $result == RESULT_SET_KEYSPACE ) {
       return Future->new->done( keyspace => $response->unpack_string );
@@ -397,7 +397,7 @@ sub prepare
 
       $response->unpack_int == RESULT_PREPARED or die "Expected RESULT_PREPARED";
 
-      return Future->new->done( Net::Async::CassandraCQL::Query->new( $self, $response ) );
+      return Future->new->done( Net::Async::CassandraCQL::Query->from_frame( $self, $response ) );
    });
 }
 
@@ -440,14 +440,14 @@ L<Protocol::CassandraCQL::ColumnMeta>.
 
 =cut
 
-sub new
+sub from_frame
 {
    my $class = shift;
    my ( $cassandra, $response ) = @_;
 
    my $id = $response->unpack_short_bytes;
 
-   my $self = $class->SUPER::new( $response );
+   my $self = $class->SUPER::from_frame( $response );
 
    $self->{cassandra} = $cassandra;
    $self->{id} = $id;

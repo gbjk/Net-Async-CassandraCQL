@@ -430,7 +430,7 @@ Handle OPCODE_AUTHENTICATE and OPCODE_REGISTER
 
 =item *
 
-Codecs for TYPE_DECIMAL, TYPE_UUID, TYPE_INET
+Codecs for TYPE_UUID, TYPE_INET
 
 =item *
 

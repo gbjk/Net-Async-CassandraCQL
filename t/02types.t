@@ -68,4 +68,12 @@ is       ( decode( VARINT => "\x11\x22\x10\xf4\xb1\x6c\x1c\xb1" ), "123456789098
    test_VARINT( -0xff ); # test sign-extension in the -ve case
 }
 
+# DECIMAL depends on VARINT so do it afterwards
+is_hexstr( encode( DECIMAL => 0 ), "\0\0\0\0\x00", 'encode DECIMAL zero' );
+is       ( decode( DECIMAL => "\0\0\0\0\x00" ), 0, 'decode DECIMAL zero' );
+is_hexstr( encode( DECIMAL => 100 ), "\0\0\0\0\x64", 'encode DECIMAL 100' );
+is       ( decode( DECIMAL => "\0\0\0\0\x64" ), 100, 'decode DECIMAL 100' );
+is_hexstr( encode( DECIMAL => 0.25 ), "\0\0\0\2\x19", 'encode DECIMAL 0.25' );
+is       ( decode( DECIMAL => "\0\0\0\2\x19" ), 0.25, 'decode DECIMAL 0.25' );
+
 done_testing;

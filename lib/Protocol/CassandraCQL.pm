@@ -172,7 +172,21 @@ sub decode_BOOLEAN { !!unpack "C", $_[0] }
 *encode_COUNTER = \&encode_BIGINT;
 *decode_COUNTER = \&decode_BIGINT;
 
-# TODO: DECIMAL
+# Not clearly docmuented, but this appears to be an INT decimal shift followed
+# by a VARINT
+sub encode_DECIMAL {
+   require Math::BigFloat;
+   my $shift = $_[0] =~ m/\.(\d*)$/ ? length $1 : 0;
+   my $n = blessed $_[0] ? $_[0] : Math::BigFloat->new( $_[0] );
+   return pack( "L>", $shift ) . encode_VARINT( $n->blsft($shift, 10) );
+}
+
+sub decode_DECIMAL {
+   require Math::BigFloat;
+   my $shift = unpack "L>", $_[0];
+   my $n = decode_VARINT( substr $_[0], 4 );
+   return scalar Math::BigFloat->new($n)->brsft($shift, 10);
+}
 
 # IEEE double
 sub encode_DOUBLE { pack   "d>", $_[0] }

@@ -30,7 +30,8 @@ ok(        decode( BOOLEAN => "\x01" ),         'decode BOOLEAN true' );
 ok(       !decode( BOOLEAN => "\x00" ),         'decode BOOLEAN false' );
 
 is_hexstr( encode( DOUBLE => 12.3456 ), "\x40\x28\xb0\xf2\x7b\xb2\xfe\xc5", 'encode DOUBLE' );
-is       ( decode( DOUBLE => "\x40\x28\xb0\xf2\x7b\xb2\xfe\xc5" ), 12.3456, 'decode DOUBLE' );
+# DOUBLE decode might not be exact
+ok(   abs( decode( DOUBLE => "\x40\x28\xb0\xf2\x7b\xb2\xfe\xc5" ) - 12.3456 ) < 0.00001, 'decode DOUBLE' );
 
 is_hexstr( encode( FLOAT => 1.234 ), "\x3f\x9d\xf3\xb6", 'encode FLOAT' );
 # FLOAT decode might not be exact

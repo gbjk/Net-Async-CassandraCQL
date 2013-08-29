@@ -327,6 +327,50 @@ sub decode {
 package Protocol::CassandraCQL::Type::SET;
 use base qw( Protocol::CassandraCQL::Type::LIST );
 
+=head1 DATA ENCODINGS
+
+The following encodings to and from perl data are supported:
+
+=head2 ASCII
+
+To or from a string scalar, which must contain only US-ASCII codepoints (i.e.
+C<ord> <= 127).
+
+=head2 BIGINT, BOOLEAN, COUNTER, DECIMAL, FLOAT, INT
+
+To or from a numeric scalar.
+
+=head2 BLOB
+
+To or from an opaque string scalar or bytes.
+
+=head2 DECIMAL
+
+To or from an instance of L<Math::BigFloat>, or from a regular numeric scalar.
+
+=head2 TIMESTAMP
+
+To or from a numeric scalar, representing miliseconds since UNIX epoch.
+
+=head2 VARCHAR
+
+To or from a string scalar containing Unicode characters.
+
+=head2 VARINT
+
+To or from an instance of L<Math::BigInt>, or from a regular numeric scalar.
+
+=head2 LIST, SET
+
+To or from an C<ARRAY> reference containing elements.
+
+=head2 MAP
+
+To or from a C<HASH> reference, where the keys used must be of some string
+type.
+
+=cut
+
 =head1 SPONSORS
 
 This code was paid for by

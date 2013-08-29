@@ -7,6 +7,7 @@ use 5.010;
 use IO::Async::Loop;
 use Net::Async::CassandraCQL;
 
+use Getopt::Long;
 use List::Util qw( max );
 use POSIX qw( strftime );
 use Term::ReadLine;
@@ -15,9 +16,13 @@ use Data::Dump 'pp';
 
 use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
 
+GetOptions(
+   'host|h=s' => \(my $HOST = "localhost"),
+) or exit 1;
+
 my $loop = IO::Async::Loop->new;
 my $cassie = Net::Async::CassandraCQL->new(
-   host => "localhost"
+   host => $HOST,
 );
 $loop->add( $cassie );
 

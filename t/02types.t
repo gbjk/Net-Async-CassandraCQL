@@ -55,6 +55,11 @@ is       ( decode( INT => "\x00\xbc\x61\x4e" ), 12345678, 'decode INT' );
 is_hexstr( encode( TIMESTAMP => 1377686281 ), "\x00\x00\x01\x40\xc4\x80\x5b\x28", 'encode TIMESTAMP' );
 is       ( decode( TIMESTAMP => "\x00\x00\x01\x40\xc4\x80\x5b\x28" ), 1377686281, 'decode TIMESTAMP' );
 
+is_hexstr( encode( UUID => "01234567-0123-0123-0123-0123456789ab" ),
+           "\x01\x23\x45\x67\x01\x23\x01\x23\x01\x23\x01\x23\x45\x67\x89\xab", 'encode UUID' );
+is       ( decode( UUID => "\x01\x23\x45\x67\x01\x23\x01\x23\x01\x23\x01\x23\x45\x67\x89\xab" ),
+           "01234567-0123-0123-0123-0123456789ab", 'decode UUID' );
+
 is_hexstr( encode( VARCHAR => "café" ), "caf\xc3\xa9", 'encode VARCHAR' );
 is       ( decode( VARCHAR => "caf\xc3\xa9" ), "café", 'decode VARCHAR' );
 

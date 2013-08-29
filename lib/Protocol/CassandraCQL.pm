@@ -147,7 +147,7 @@ performance.
 
 =item *
 
-Codecs for TYPE_UUID, TYPE_INET
+Codecs for TYPE_INET
 
 =item *
 

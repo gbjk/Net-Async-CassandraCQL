@@ -197,7 +197,14 @@ use base qw( Protocol::CassandraCQL::Type );
 sub encode {  pack   "Q>", ($_[1] * 1000) }
 sub decode { (unpack "Q>", $_[1]) / 1000  }
 
-# TODO: UUID
+# UUID is just a hex string
+package Protocol::CassandraCQL::Type::UUID;
+use base qw( Protocol::CassandraCQL::Type );
+sub encode { ( my $hex = $_[1] ) =~ s/-//g; pack "H32", $hex }
+sub decode { join "-", unpack "H8 H4 H4 H4 H12", $_[1] }
+
+package Protocol::CassandraCQL::Type::TIMEUUID;
+use base qw( Protocol::CassandraCQL::Type::UUID );
 
 # Arbitrary-precision 2s-complement signed integer
 # Math::BigInt doesn't handle signed, but we can mangle it
@@ -351,6 +358,11 @@ To or from an instance of L<Math::BigFloat>, or from a regular numeric scalar.
 =head2 TIMESTAMP
 
 To or from a numeric scalar, representing miliseconds since UNIX epoch.
+
+=head2 UUID, TIMEUUID
+
+To or from a string containing hex digits and hyphens, in the form
+C<xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx>.
 
 =head2 VARCHAR
 

@@ -111,8 +111,6 @@ sub encode
    my $self = shift;
    my ( $v ) = @_;
 
-   return undef if !defined $v;
-
    my $type = $self->name;
    if( my $code = __PACKAGE__->can( "encode_$type" ) ) {
       return $code->( $v );
@@ -133,8 +131,6 @@ sub decode
 {
    my $self = shift;
    my ( $b ) = @_;
-
-   return undef if !defined $b;
 
    my $type = $self->name;
    if( my $code = __PACKAGE__->can( "decode_$type" ) ) {

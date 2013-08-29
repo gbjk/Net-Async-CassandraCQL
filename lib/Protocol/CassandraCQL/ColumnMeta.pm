@@ -181,7 +181,7 @@ sub encode_data
    my $self = shift;
    my @data = @_;
 
-   return map { $self->column_type( $_ )->encode( $data[$_] ) }
+   return map { defined $data[$_] ? $self->column_type( $_ )->encode( $data[$_] ) : undef }
           0 .. $#data;
 }
 
@@ -197,7 +197,7 @@ sub decode_data
    my $self = shift;
    my @bytes = @_;
 
-   return map { $self->column_type( $_ )->decode( $bytes[$_] ) }
+   return map { defined $bytes[$_] ? $self->column_type( $_ )->decode( $bytes[$_] ) : undef }
           0 .. $#bytes;
 }
 

@@ -147,11 +147,6 @@ performance.
 
 =item *
 
-Use something faster than dynamic method dispatch for C<encode()> and
-C<decode()>.
-
-=item *
-
 Codecs for TYPE_UUID, TYPE_INET
 
 =item *

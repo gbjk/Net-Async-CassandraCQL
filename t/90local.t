@@ -171,4 +171,30 @@ EOCQL
    }
 }
 
+# Now test the collections
+{
+   $cass->query( <<'EOCQL', CONSISTENCY_ONE )->get;
+CREATE TABLE collections (
+   key text PRIMARY KEY,
+   a_set set<text>,
+   a_list list<int>,
+   a_map map<text,text>);
+EOCQL
+   my $table = 1;
+   END { $table and $cass->query( "DROP TABLE collections;", CONSISTENCY_ONE )->await }
+
+   $cass->query( "INSERT INTO collections (key, a_set) VALUES ('letters', {'a', 'b', 'c'});", CONSISTENCY_ONE )->get;
+   $cass->query( "INSERT INTO collections (key, a_list) VALUES ('numbers', [1, 2, 3]);", CONSISTENCY_ONE )->get;
+   $cass->query( "INSERT INTO collections (key, a_map) VALUES ('upcase', {'x':'X', 'y':'Y'})", CONSISTENCY_ONE )->get;
+
+   my ( undef, $result ) = $cass->query( "SELECT * FROM collections;", CONSISTENCY_ONE )->get;
+
+   # TODO: Consider $result->rowmap_hash("key")
+   my %rowmap = map { $_->{key} => $_ } $result->rows_hash;
+
+   is_deeply( $rowmap{letters}{a_set},  [qw( a b c )],    'SET serialisation' );
+   is_deeply( $rowmap{numbers}{a_list}, [ 1, 2, 3 ],      'LIST serialisation' );
+   is_deeply( $rowmap{upcase}{a_map},   {x=>"X", y=>"Y"}, 'MAP serialisation' );
+}
+
 done_testing;

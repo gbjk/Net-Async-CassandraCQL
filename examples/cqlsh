@@ -108,4 +108,20 @@ sub Protocol::CassandraCQL::Type::TIMESTAMP::stringify {
    strftime( "%Y-%m-%d %H:%M:%S", localtime $sec ) . sprintf ".%03d", $msec }
 sub Protocol::CassandraCQL::Type::VARCHAR::stringify { qq('$_[1]') }
 
+sub Protocol::CassandraCQL::Type::LIST::stringify {
+   my $l = $_[1];
+   "[" . join(", ", map { $_[0]->element_type->stringify($_) } @$l) . "]"
+}
+
+sub Protocol::CassandraCQL::Type::SET::stringify {
+   my $l = $_[1];
+   "{" . join(", ", map { $_[0]->element_type->stringify($_) } @$l) . "}"
+}
+
+sub Protocol::CassandraCQL::Type::MAP::stringify {
+   my $m = $_[1];
+   "{" . join(", ", map { $_[0]->key_type->stringify($_) . "," .
+                          $_[0]->value_type->stringify($m->{$_}) } sort keys %$m ) . "}"
+}
+
 sub Protocol::CassandraCQL::Type::stringify { $_[1] }

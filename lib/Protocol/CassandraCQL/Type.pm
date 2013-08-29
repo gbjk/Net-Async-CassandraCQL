@@ -15,6 +15,7 @@ use Carp;
 use Encode ();
 
 use Protocol::CassandraCQL qw( :types );
+use Protocol::CassandraCQL::Frame; # collection types use it for encoding/decoding
 
 =head1 NAME
 
@@ -43,18 +44,36 @@ sub from_frame
    my ( $frame ) = @_;
 
    my $typeid = $frame->unpack_short;
-   return Protocol::CassandraCQL::Type->from_name( Protocol::CassandraCQL::typename( $typeid ) );
+   my $class = "Protocol::CassandraCQL::Type::" . Protocol::CassandraCQL::typename( $typeid );
+
+   if( $class->can( "from_frame" ) != \&from_frame ) {
+      return $class->from_frame( @_ );
+   }
+   elsif( $class->can( "new" ) ) {
+      return $class->new;
+   }
+
+   die "TODO: Unrecognised typeid $typeid";
 }
 
 # Just for unit testing
+# This and the LIST/MAP from_name methods form a simple incremental parser
 sub from_name
 {
    shift;
-   my ( $name ) = @_;
 
+   $_[0] =~ s/^([^<,>]+)//;
+   my $name = $1;
    my $class = "Protocol::CassandraCQL::Type::$name";
-   die "Unrecognised type name '$name'" unless $class->can( "new" );
-   $class->new
+
+   if( $class->can( "from_name" ) != \&from_name ) {
+      return $class->from_name( @_ );
+   }
+   elsif( $class->can( "new" ) ) {
+      return $class->new;
+   }
+
+   die "Unrecognised type name '$name'";
 }
 
 sub new
@@ -218,6 +237,95 @@ sub decode {
 }
 
 # TODO: INET
+
+=head1 COLLECTION TYPES
+
+=head2 $etype = $type->element_type
+
+Returns the type of the elements in the list or set, for C<LIST> and C<SET>
+types.
+
+=head2 $ktype = $type->key_type
+
+=head2 $vtype = $type->value_type
+
+Returns the type of the keys and values in the map, for C<MAP> types.
+
+=cut
+
+package Protocol::CassandraCQL::Type::LIST;
+use base qw( Protocol::CassandraCQL::Type );
+sub from_frame {
+   my $class = shift;
+   my $etype = Protocol::CassandraCQL::Type->from_frame( @_ );
+   bless [ $etype ], $class;
+}
+sub from_name {
+   my $class = shift;
+   $_[0] =~ s/^<// or die "Expected '<' following collection name\n";
+   my $etype = Protocol::CassandraCQL::Type->from_name( @_ );
+   $_[0] =~ s/^>// or die "Expected '>' following collection element type\n";
+   bless [ $etype ], $class;
+}
+sub element_type { $_[0][0] }
+sub name { $_[0]->SUPER::name . "<" . $_[0][0]->name . ">" }
+sub encode {
+   my $l = $_[1];
+   my $f = Protocol::CassandraCQL::Frame->new
+      ->pack_short( scalar @$l );
+   foreach my $i ( 0 .. $#$l ) {
+      $f->pack_short_bytes( $_[0][0]->encode( $l->[$i] ) );
+   }
+   $f->bytes
+}
+sub decode {
+   local $_;
+   my $f = Protocol::CassandraCQL::Frame->new( $_[1] );
+   my $n = $f->unpack_short;
+   return [ map { $_[0][0]->decode( $f->unpack_short_bytes ) } 1 .. $n ]
+}
+
+package Protocol::CassandraCQL::Type::MAP;
+use base qw( Protocol::CassandraCQL::Type );
+sub from_frame {
+   my $class = shift;
+   my $ktype = Protocol::CassandraCQL::Type->from_frame( @_ );
+   my $vtype = Protocol::CassandraCQL::Type->from_frame( @_ );
+   bless [ $ktype, $vtype ], $class;
+}
+sub from_name {
+   my $class = shift;
+   $_[0] =~ s/^<// or die "Expected '<' following collection name\n";
+   my $ktype = Protocol::CassandraCQL::Type->from_name( @_ );
+   $_[0] =~ s/^,// or die "Expected ',' following collection key type\n";
+   my $vtype = Protocol::CassandraCQL::Type->from_name( @_ );
+   $_[0] =~ s/^>// or die "Expected '>' following collection value type\n";
+   bless [ $ktype, $vtype ], $class;
+}
+sub key_type   { $_[0][0] }
+sub value_type { $_[0][1] }
+sub name { $_[0]->SUPER::name . "<" . $_[0][0]->name . "," . $_[0][1]->name . ">" }
+sub encode {
+   my $m = $_[1];
+   my $f = Protocol::CassandraCQL::Frame->new
+      ->pack_short( scalar keys %$m );
+   foreach my $k ( keys %$m ) {
+      $f->pack_short_bytes( $_[0][0]->encode( $k ) );
+      $f->pack_short_bytes( $_[0][1]->encode( $m->{$k} ) );
+   }
+   $f->bytes
+}
+sub decode {
+   local $_;
+   my $f = Protocol::CassandraCQL::Frame->new( $_[1] );
+   my $n = $f->unpack_short;
+   return { map { $_[0][0]->decode( $f->unpack_short_bytes ),
+                  $_[0][1]->decode( $f->unpack_short_bytes ) } 1 .. $n }
+}
+
+# We just represent a SET as a LIST - use an ARRAY of elements
+package Protocol::CassandraCQL::Type::SET;
+use base qw( Protocol::CassandraCQL::Type::LIST );
 
 =head1 SPONSORS
 

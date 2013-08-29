@@ -54,4 +54,37 @@ use Protocol::CassandraCQL::ColumnMeta;
               '->decode_data' );
 }
 
+# Collections
+{
+   my $meta = Protocol::CassandraCQL::ColumnMeta->from_frame(
+      Protocol::CassandraCQL::Frame->new(
+         "\0\0\0\1\0\0\0\3\0\4test\0\x0bcollections" .
+            "\0\3set\0\x22\0\x09\0\4list\0\x20\0\x0A\0\3map\0\x21\0\x0A\0\x09"
+      )
+   );
+
+   is( scalar $meta->columns, 3, '$meta->columns is 3' );
+
+   is( $meta->column_type(0)->name, "SET<INT>", '$meta->column_type(0)' );
+   is( $meta->column_type(0)->element_type->name, "INT", '$meta->column_type(0) etype' );
+   is( $meta->column_type(1)->name, "LIST<TEXT>", '$meta->column_type(1)' );
+   is( $meta->column_type(1)->element_type->name, "TEXT", '$meta->column_type(1) etype' );
+   is( $meta->column_type(2)->name, "MAP<TEXT,INT>", '$meta->column_type(2)' );
+   is( $meta->column_type(2)->key_type->name,   "TEXT", '$meta->column_type(2) ktype' );
+   is( $meta->column_type(2)->value_type->name, "INT",  '$meta->column_type(2) vtype' );
+
+   my @bytes = $meta->encode_data(
+      [ 10, 20, 30 ], [qw( A B C )], { name => 100 } );
+
+   is_hexstr( $bytes[0],
+      "\0\3\0\4\x00\x00\x00\x0a\0\4\x00\x00\x00\x14\0\4\x00\x00\x00\x1e",
+      '->encode_data SET<INT>' );
+   is_hexstr( $bytes[1],
+      "\0\3\0\1A\0\1B\0\1C",
+      '->encode_data LIST<TEXT>' );
+   is_hexstr( $bytes[2],
+      "\0\1\0\4name\0\4\x00\x00\x00\x64",
+      '->encode_data MAP<TEXT,INT>' );
+}
+
 done_testing;

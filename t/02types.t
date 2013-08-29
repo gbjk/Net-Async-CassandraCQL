@@ -21,7 +21,7 @@ BEGIN {
 }
 
 {
-   my $type = Protocol::CassandraCQL::Type->from_name( "VARCHAR" );
+   my $type = Protocol::CassandraCQL::Type->from_name( do { my $tmp = "VARCHAR" } );
    is( $type->name, "VARCHAR", '$type->name' );
 }
 
@@ -87,5 +87,32 @@ is_hexstr( encode( DECIMAL => 100 ), "\0\0\0\0\x64", 'encode DECIMAL 100' );
 is       ( decode( DECIMAL => "\0\0\0\0\x64" ), 100, 'decode DECIMAL 100' );
 is_hexstr( encode( DECIMAL => 0.25 ), "\0\0\0\2\x19", 'encode DECIMAL 0.25' );
 is       ( decode( DECIMAL => "\0\0\0\2\x19" ), 0.25, 'decode DECIMAL 0.25' );
+
+# Now the collections
+
+is_hexstr( encode( "LIST<INT>" => [1,2,3] ),
+           "\0\3\0\4\x00\x00\x00\x01\0\4\x00\x00\x00\x02\0\4\x00\x00\x00\x03",
+           'encode LIST<INT>' );
+is_deeply( decode( "LIST<INT>" => "\0\3\0\4\x00\x00\x00\x01\0\4\x00\x00\x00\x02\0\4\x00\x00\x00\x03" ),
+           [1,2,3],
+           'decode LIST<INT>' );
+
+# Don't want to rely on ordering
+is_hexstr( encode( "MAP<VARCHAR,INT>" => { one => 1 } ),
+           "\0\1\0\3one\0\4\x00\x00\x00\x01",
+           'encode MAP<VARCHAR,INT> 1' );
+is_deeply( decode( "MAP<VARCHAR,INT>" => "\0\1\0\3one\0\4\x00\x00\x00\x01" ),
+           { one => 1 },
+           'encode MAP<VARCHAR,INT> 1' );
+is_deeply( decode( "MAP<VARCHAR,INT>", encode( "MAP<VARCHAR,INT>", { one => 1, two => 2, three => 3 } ) ),
+           { one => 1, two => 2, three => 3 },
+           'encode/decode MAP<VARCHAR,INT>' );
+
+is_hexstr( encode( "SET<VARCHAR>" => [qw( red green blue )] ),
+           "\0\3\0\3red\0\5green\0\4blue",
+           'encode SET<VARCHAR>' );
+is_deeply( decode( "SET<VARCHAR>" => "\0\3\0\3red\0\5green\0\4blue" ),
+           [qw( red green blue )],
+           'decode SET<VARCHAR>' );
 
 done_testing;

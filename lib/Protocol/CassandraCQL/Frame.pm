@@ -57,7 +57,8 @@ Returns a new frame buffer, optionally initialised with the given byte string.
 sub new
 {
    my $class = shift;
-   my $bytes = $_[0] // "";
+   my $bytes = "";
+   $bytes = $_[0] if defined $_[0];
    bless \$bytes, $class;
 }
 

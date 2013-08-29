@@ -8,10 +8,21 @@ use Test::More;
 use Test::HexString;
 use Math::BigInt;
 
-use Protocol::CassandraCQL;
+use Protocol::CassandraCQL::Type;
 BEGIN {
-   *encode = \&Protocol::CassandraCQL::encode;
-   *decode = \&Protocol::CassandraCQL::decode;
+   *encode = sub {
+      my ( $typename, $v ) = @_;
+      Protocol::CassandraCQL::Type->from_name( $typename )->encode( $v );
+   };
+   *decode = sub {
+      my ( $typename, $b ) = @_;
+      Protocol::CassandraCQL::Type->from_name( $typename )->decode( $b );
+   };
+}
+
+{
+   my $type = Protocol::CassandraCQL::Type->from_name( "VARCHAR" );
+   is( $type->name, "VARCHAR", '$type->name' );
 }
 
 is_hexstr( encode( ASCII => "hello" ), "hello", 'encode ASCII' );

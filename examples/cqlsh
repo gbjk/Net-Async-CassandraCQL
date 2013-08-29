@@ -14,7 +14,7 @@ use Term::ReadLine;
 
 use Data::Dump 'pp';
 
-use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
+use Protocol::CassandraCQL qw( CONSISTENCY_ONE :types );
 
 GetOptions(
    'host|h=s' => \(my $HOST = "localhost"),
@@ -63,26 +63,26 @@ while( defined( my $query = $term->readline(sprintf "\ncql%s> ", defined $keyspa
          foreach my $col ( 0 .. $#$d ) {
             $columns[$col][$i] = "", next if !defined $d->[$col];
 
-            my $type = $result->column_type( $col );
+            my $typeid = $result->column_type( $col )->id;
             my $str;
-            if( $type eq "BOOLEAN" ) {
+            if( $typeid == TYPE_BOOLEAN ) {
                $str = $d->[$col] ? "true" : "false";
             }
-            elsif( $type eq "BLOB" ) {
+            elsif( $typeid == TYPE_BLOB ) {
                $str = unpack "H*", $d->[$col];
             }
-            elsif( $type eq "DOUBLE" ) {
+            elsif( $typeid == TYPE_DOUBLE ) {
                $str = sprintf "%.9g", $d->[$col];
             }
-            elsif( $type eq "FLOAT" ) {
+            elsif( $typeid == TYPE_FLOAT ) {
                $str = sprintf "%.5g", $d->[$col];
             }
-            elsif( $type eq "TIMESTAMP" ) {
+            elsif( $typeid == TYPE_TIMESTAMP ) {
                my $sec  = int( $d->[$col] );
                my $msec = 1000 * ( $d->[$col] - $sec );
                $str = strftime( "%Y-%m-%d %H:%M:%S", localtime $sec ) . sprintf ".%03d", $msec;
             }
-            elsif( $type eq "ASCII" or $type eq "VARCHAR" ) {
+            elsif( $typeid == TYPE_ASCII or $typeid == TYPE_VARCHAR ) {
                $str = qq("$d->[$col]"); # TODO - neater somehow
             }
             else {
@@ -94,7 +94,7 @@ while( defined( my $query = $term->readline(sprintf "\ncql%s> ", defined $keyspa
       }
       my @colwidths = map {
          max map { length } $result->column_shortname($_),
-                            $result->column_type($_),
+                            $result->column_type($_)->name,
                             @{ $columns[$_] }
       } 0 .. $#columns;
 
@@ -102,7 +102,7 @@ while( defined( my $query = $term->readline(sprintf "\ncql%s> ", defined $keyspa
       print join( " | ", map { sprintf "%-*s", $colwidths[$_], $result->column_shortname($_) } 0 .. $#columns ) . "\n";
 
       # Column types
-      print join( " | ", map { sprintf "%-*s", $colwidths[$_], scalar $result->column_type($_) } 0 .. $#columns ) . "\n";
+      print join( " | ", map { sprintf "%-*s", $colwidths[$_], $result->column_type($_)->name } 0 .. $#columns ) . "\n";
 
       # Divider
       print join( "-+-", map { "-" x $colwidths[$_] } 0 .. $#columns ) . "\n";

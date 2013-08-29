@@ -35,9 +35,9 @@ use Protocol::CassandraCQL::ColumnMeta;
    is( $meta->column_shortname( 1 ), "i",   '$meta->column_shortname(1)' );
    is( $meta->column_shortname( 2 ), "b",   '$meta->column_shortname(2)' );
 
-   is( $meta->column_type(0), "TEXT",   '$meta->column_type(0)' );
-   is( $meta->column_type(1), "INT",    '$meta->column_type(1)' );
-   is( $meta->column_type(2), "BIGINT", '$meta->column_type(2)' );
+   is( $meta->column_type(0)->name, "TEXT",   '$meta->column_type(0)->name' );
+   is( $meta->column_type(1)->name, "INT",    '$meta->column_type(1)->name' );
+   is( $meta->column_type(2)->name, "BIGINT", '$meta->column_type(2)->name' );
 
    is( $meta->find_column(            "key" ), 0, '$meta->find_column( "key" )' );
    is( $meta->find_column(      "table.key" ), 0, '$meta->find_column( "table.key" )' );

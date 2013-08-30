@@ -189,12 +189,11 @@ EOCQL
 
    my ( undef, $result ) = $cass->query( "SELECT * FROM collections;" )->get;
 
-   # TODO: Consider $result->rowmap_hash("key")
-   my %rowmap = map { $_->{key} => $_ } $result->rows_hash;
+   my $map = $result->rowmap_hash( "key" );
 
-   is_deeply( $rowmap{letters}{a_set},  [qw( a b c )],    'SET serialisation' );
-   is_deeply( $rowmap{numbers}{a_list}, [ 1, 2, 3 ],      'LIST serialisation' );
-   is_deeply( $rowmap{upcase}{a_map},   {x=>"X", y=>"Y"}, 'MAP serialisation' );
+   is_deeply( $map->{letters}{a_set},  [qw( a b c )],    'SET serialisation' );
+   is_deeply( $map->{numbers}{a_list}, [ 1, 2, 3 ],      'LIST serialisation' );
+   is_deeply( $map->{upcase}{a_map},   {x=>"X", y=>"Y"}, 'MAP serialisation' );
 }
 
 done_testing;

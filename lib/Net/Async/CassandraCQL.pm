@@ -190,19 +190,12 @@ sub on_read
    my $self = shift;
    my ( $buffref, $eof ) = @_;
 
-   return 0 unless length $$buffref >= 8;
-
-   my $bodylen = unpack( "x4 N", $$buffref );
-   return 0 unless length $$buffref >= 8 + $bodylen;
-
-   my ( $version, $flags, $streamid, $opcode ) = unpack( "C C C C x4", substr $$buffref, 0, 8, "" );
-   my $body = substr $$buffref, 0, $bodylen, "";
+   my ( $version, $flags, $streamid, $opcode, $frame ) =
+      Protocol::CassandraCQL::Frame->parse( $$buffref ) or return 0;
 
    # v1 response
    $version == 0x81 or
       $self->fail_all_and_close( sprintf "Unexpected message version %#02x\n", $version ), return;
-
-   my $frame = Protocol::CassandraCQL::Frame->new( $body );
 
    # TODO: flags
    if( my $f = $self->{streams}[$streamid] ) {
@@ -308,10 +301,7 @@ sub _send
    my $self = shift;
    my ( $opcode, $id, $frame, $f ) = @_;
 
-   my $version = 0x01;
-   my $flags   = 0;
-   my $body    = $frame->bytes;
-   $self->write( pack "C C C C N a*", $version, $flags, $id, $opcode, length $body, $body );
+   $self->write( $frame->build( 0x01, 0, $id, $opcode ) );
 
    $self->{streams}[$id] = $f;
 }

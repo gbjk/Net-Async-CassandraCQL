@@ -10,6 +10,8 @@ use warnings;
 
 our $VERSION = '0.02';
 
+use Carp;
+
 use Protocol::CassandraCQL::Type;
 
 =head1 NAME
@@ -171,8 +173,9 @@ sub find_column
 
 =head2 @bytes = $meta->encode_data( @data )
 
-Returns a list of encoded bytestrings from the given data according to the type
-of each column.
+Returns a list of encoded bytestrings from the given data according to the
+type of each column. Checks each value is valid; if not throws an exception
+explaining which column failed and why.
 
 =cut
 
@@ -180,6 +183,12 @@ sub encode_data
 {
    my $self = shift;
    my @data = @_;
+
+   foreach my $i ( 0 .. $#data ) {
+      my $e = $self->column_type( $i )->validate( $data[$i] ) or next;
+
+      croak "Cannot encode ".$self->column_shortname( $i ).": $e";
+   }
 
    return map { defined $data[$_] ? $self->column_type( $_ )->encode( $data[$_] ) : undef }
           0 .. $#data;

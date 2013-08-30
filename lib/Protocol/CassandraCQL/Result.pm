@@ -11,6 +11,8 @@ use base qw( Protocol::CassandraCQL::ColumnMeta );
 
 our $VERSION = '0.02';
 
+use Carp;
+
 use Protocol::CassandraCQL qw( :types );
 
 =head1 NAME
@@ -76,6 +78,8 @@ sub rowbytes
 {
    my $self = shift;
    my ( $idx ) = @_;
+
+   croak "No such row $idx" unless $idx >= 0 and $idx < @{ $self->{rows} };
 
    return @{ $self->{rows}[$idx] };
 }

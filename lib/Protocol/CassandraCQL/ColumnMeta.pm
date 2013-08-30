@@ -117,6 +117,7 @@ sub column_name
    my $self = shift;
    my ( $idx ) = @_;
 
+   croak "No such column $idx" unless $idx >= 0 and $idx < @{ $self->{columns} };
    my @n = @{ $self->{columns}[$idx] }[0..2];
 
    return @n if wantarray;
@@ -136,6 +137,7 @@ sub column_shortname
    my $self = shift;
    my ( $idx ) = @_;
 
+   croak "No such column $idx" unless $idx >= 0 and $idx < @{ $self->{columns} };
    return $self->{columns}[$idx][3];
 }
 
@@ -151,8 +153,8 @@ sub column_type
    my $self = shift;
    my ( $idx ) = @_;
 
+   croak "No such column $idx" unless $idx >= 0 and $idx < @{ $self->{columns} };
    return $self->{columns}[$idx][4];
-
 }
 
 =head2 $idx = $meta->find_column( $name )
@@ -177,12 +179,18 @@ Returns a list of encoded bytestrings from the given data according to the
 type of each column. Checks each value is valid; if not throws an exception
 explaining which column failed and why.
 
+An exception is thrown if the wrong number of values is passed.
+
 =cut
 
 sub encode_data
 {
    my $self = shift;
    my @data = @_;
+
+   my $n = @{ $self->{columns} };
+   croak "Too many values" if @data > $n;
+   croak "Not enough values" if @data < $n;
 
    foreach my $i ( 0 .. $#data ) {
       my $e = $self->column_type( $i )->validate( $data[$i] ) or next;
@@ -191,7 +199,7 @@ sub encode_data
    }
 
    return map { defined $data[$_] ? $self->column_type( $_ )->encode( $data[$_] ) : undef }
-          0 .. $#data;
+          0 .. $n-1;
 }
 
 =head2 @data = $meta->decode_data( @bytes )

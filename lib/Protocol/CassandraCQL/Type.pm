@@ -24,7 +24,7 @@ C<Protocol::CassandraCQL::Type> - represents a Cassandra CQL data type
 =head1 DESCRIPTION
 
 Objects in this class represent distinct types that may be found in Cassandra
-CQLv3, either as columns in query result rows, or as bind parameters to
+CQL3, either as columns in query result rows, or as bind parameters to
 prepared statements. It is used by L<Protocol::CassandraCQL::ColumnMeta>.
 
 =cut

@@ -63,7 +63,7 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
 =head1 DESCRIPTION
 
-This module allows use of the C<CQLv3> interface of a Cassandra database. It
+This module allows use of the C<CQL3> interface of a Cassandra database. It
 fully supports asynchronous operation via L<IO::Async>, allowing both direct
 queries and prepared statements to be managed concurrently, if required.
 Alternatively, as the interface is entirely based on L<Future> objects, it can

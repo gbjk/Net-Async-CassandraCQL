@@ -15,12 +15,12 @@ our @EXPORT_OK = qw();
 
 =head1 NAME
 
-C<Protocol::CassandraCQL> - wire protocol support functions for Cassandra CQLv3
+C<Protocol::CassandraCQL> - wire protocol support functions for Cassandra CQL3
 
 =head1 DESCRIPTION
 
 This module provides the basic constants and other support functions required
-to communicate with a Cassandra database using C<CQLv3>. It is not in itself a
+to communicate with a Cassandra database using C<CQL3>. It is not in itself a
 CQL client; it simply provides the necessary support functions to allow one to
 be written.
 

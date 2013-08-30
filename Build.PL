@@ -12,6 +12,7 @@ my $build = Module::Build->new(
    module_name => 'Net::Async::CassandraCQL',
    requires => {
       'Encode' => 0,
+      'Future' => '0.13',
       'Math::BigInt' => 0,
       'IO::Async::Protocol::Stream' => 0,
    },

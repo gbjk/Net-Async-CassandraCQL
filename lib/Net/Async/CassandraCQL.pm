@@ -15,6 +15,8 @@ use base qw( IO::Async::Protocol::Stream );
 
 use Carp;
 
+use Future 0.13;
+
 use Protocol::CassandraCQL qw( :opcodes :results );
 use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ColumnMeta;

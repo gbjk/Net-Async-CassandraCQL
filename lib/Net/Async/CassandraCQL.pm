@@ -42,7 +42,7 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
 
  $cass->connect->then( sub {
-    $cass->query( "USE my-keyspace;" );
+    $cass->query( "USE my-keyspace" );
  })->get;
 
 
@@ -53,7 +53,7 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
  Future->needs_all( @f )->get;
 
 
- my $get_stmt = $cass->prepare( "SELECT v FROM numbers;" )->get;
+ my $get_stmt = $cass->prepare( "SELECT v FROM numbers" )->get;
 
  my ( undef, $result ) = $get_stmt->execute( [] )->get;
 

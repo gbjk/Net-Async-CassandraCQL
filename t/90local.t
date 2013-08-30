@@ -116,7 +116,7 @@ CREATE TABLE numbers (
    flt float, dbl double, d decimal)
 EOCQL
    my $table = 1;
-   END { $table and $cass->query( "DROP TABLE numbers;" )->await }
+   END { $table and $cass->query( "DROP TABLE numbers" )->await }
 
    my %ints = (
       zero => 0,
@@ -127,7 +127,7 @@ EOCQL
       million => 1_000_000,
    );
 
-   my $getn_stmt = $cass->prepare( "SELECT * FROM numbers WHERE key = ?;" )->get;
+   my $getn_stmt = $cass->prepare( "SELECT * FROM numbers WHERE key = ?" )->get;
 
    foreach my $name ( keys %ints ) {
       my $n = $ints{$name};
@@ -178,13 +178,13 @@ CREATE TABLE collections (
    key text PRIMARY KEY,
    a_set set<text>,
    a_list list<int>,
-   a_map map<text,text>);
+   a_map map<text,text>)
 EOCQL
    my $table = 1;
-   END { $table and $cass->query( "DROP TABLE collections;" )->await }
+   END { $table and $cass->query( "DROP TABLE collections" )->await }
 
-   $cass->query( "INSERT INTO collections (key, a_set) VALUES ('letters', {'a', 'b', 'c'});" )->get;
-   $cass->query( "INSERT INTO collections (key, a_list) VALUES ('numbers', [1, 2, 3]);" )->get;
+   $cass->query( "INSERT INTO collections (key, a_set) VALUES ('letters', {'a', 'b', 'c'})" )->get;
+   $cass->query( "INSERT INTO collections (key, a_list) VALUES ('numbers', [1, 2, 3])" )->get;
    $cass->query( "INSERT INTO collections (key, a_map) VALUES ('upcase', {'x':'X', 'y':'Y'})" )->get;
 
    my ( undef, $result ) = $cass->query( "SELECT * FROM collections;" )->get;

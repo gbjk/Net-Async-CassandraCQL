@@ -12,7 +12,7 @@ use IO::Async::Loop;
 use IO::Async::Stream;
 
 use Net::Async::CassandraCQL;
-use Protocol::CassandraCQL qw( CONSISTENCY_ANY CONSISTENCY_ONE );
+use Protocol::CassandraCQL qw( CONSISTENCY_ANY CONSISTENCY_ONE CONSISTENCY_TWO );
 
 my $loop = IO::Async::Loop->new();
 testing_loop( $loop );
@@ -164,6 +164,27 @@ $loop->add( $cass );
 
    is_deeply( [ $f->get ], [ schema_change => [qw( DROPPED test users )] ],
               '->query DROP TABLE returns schema change' );
+}
+
+# ->query using default_consistency
+{
+   $cass->configure( default_consistency => CONSISTENCY_TWO );
+
+   my $f = $cass->query( "SELECT * FROM things;" );
+
+   my $stream = "";
+   wait_for_stream { length $stream >= 8 + 27 } $S2 => $stream;
+
+   # OPCODE_QUERY
+   is_hexstr( $stream,
+              "\x01\x00\x01\x07\0\0\0\x1b" .
+                 "\0\0\0\x15SELECT * FROM things;\0\2",
+              'stream after ->query using default_consistency' );
+
+   # OPCODE_RESULT - void but we don't care
+   $S2->syswrite( "\x81\x00\x01\x08\0\0\0\4\0\0\0\0" );
+
+   wait_for { $f->is_ready };
 }
 
 # ->prepare and ->execute

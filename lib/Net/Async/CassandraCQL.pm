@@ -36,6 +36,7 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
  my $cass = Net::Async::CassandraCQL->new(
     host => "localhost",
+    default_consistency => CONSISTENCY_QUORUM,
  );
  $loop->add( $cass );
 
@@ -47,15 +48,14 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
  my @f;
  foreach my $number ( 1 .. 100 ) {
-    push @f, $cass->query( "INSERT INTO numbers (v) VALUES $number;",
-       CONSISTENCY_QUORUM );
+    push @f, $cass->query( "INSERT INTO numbers (v) VALUES $number" );
  }
  Future->needs_all( @f )->get;
 
 
  my $get_stmt = $cass->prepare( "SELECT v FROM numbers;" )->get;
 
- my ( undef, $result ) = $get_stmt->execute( [], CONSISTENCY_QUORUM )->get;
+ my ( undef, $result ) = $get_stmt->execute( [] )->get;
 
  foreach my $row ( $result->rows_hash) {
     say "We have a number " . $row->{v};
@@ -89,6 +89,11 @@ The hostname of the Cassandra node to connect to
 
 Optional. The service name or port number to connect to.
 
+=item default_consistency => INT
+
+Optional. Default consistency level to use if none is provided to C<query> or
+C<execute>.
+
 =back
 
 =cut
@@ -107,7 +112,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( host service )) {
+   foreach (qw( host service default_consistency )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -391,6 +396,9 @@ sub query
    my $self = shift;
    my ( $cql, $consistency ) = @_;
 
+   $consistency //= $self->{default_consistency};
+   defined $consistency or croak "'query' needs a consistency level";
+
    $self->send_message( OPCODE_QUERY,
       Protocol::CassandraCQL::Frame->new->pack_lstring( $cql )
                                         ->pack_short( $consistency )
@@ -443,6 +451,9 @@ sub execute
 {
    my $self = shift;
    my ( $id, $data, $consistency ) = @_;
+
+   $consistency //= $self->{default_consistency};
+   defined $consistency or croak "'execute' needs a consistency level";
 
    my $frame = Protocol::CassandraCQL::Frame->new
       ->pack_short_bytes( $id )

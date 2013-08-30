@@ -34,9 +34,11 @@ testing_loop( $loop );
 my $cass = Net::Async::CassandraCQL->new( default_consistency => CONSISTENCY_ONE );
 $loop->add( $cass );
 
-$cass->connect( host => $CONFIG{host}, service => $CONFIG{port} )->get;
-
-$cass->use_keyspace( $CONFIG{keyspace} )->get;
+$cass->connect(
+   host     => $CONFIG{host},
+   service  => $CONFIG{port},
+   keyspace => $CONFIG{keyspace},
+)->get;
 
 $cass->query( "CREATE TABLE tbl1 (key varchar PRIMARY KEY, t1 varchar, i1 int)" )->get;
 my $table = 1;

@@ -36,14 +36,13 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
  my $cass = Net::Async::CassandraCQL->new(
     host => "localhost",
+    keyspace => "my-keyspace",
     default_consistency => CONSISTENCY_QUORUM,
  );
  $loop->add( $cass );
 
 
- $cass->connect->then( sub {
-    $cass->use_keyspace( "my-keyspace" )
- })->get;
+ $cass->connect->get;
 
 
  my @f;
@@ -57,7 +56,7 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
  my ( undef, $result ) = $get_stmt->execute( [] )->get;
 
- foreach my $row ( $result->rows_hash) {
+ foreach my $row ( $result->rows_hash ) {
     say "We have a number " . $row->{v};
  }
 
@@ -89,6 +88,11 @@ The hostname of the Cassandra node to connect to
 
 Optional. The service name or port number to connect to.
 
+=item keyspace => STRING
+
+Optional. If set, a C<USE keyspace> query will be issued as part of the
+connect method.
+
 =item default_consistency => INT
 
 Optional. Default consistency level to use if none is provided to C<query> or
@@ -112,7 +116,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( host service default_consistency )) {
+   foreach (qw( host service keyspace default_consistency )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -160,6 +164,8 @@ Takes the following named arguments:
 
 =item service => STRING
 
+=item keyspace => STRING
+
 Optional. Overrides the configured values.
 
 =back
@@ -178,10 +184,17 @@ sub connect
    $args{host}    //= $self->{host}    or croak "Require 'host'";
    $args{service} //= $self->{service} // DEFAULT_CQL_PORT;
 
+   my $keyspace = $args{keyspace} // $self->{keyspace};
+
    return ( $self->{connect_f} ||=
       $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } ) )
       ->and_then( sub {
          $self->startup
+      })->then( sub {
+         my $f = shift;
+         return $f unless defined $keyspace;
+
+         $self->use_keyspace( $keyspace );
       });
 }
 

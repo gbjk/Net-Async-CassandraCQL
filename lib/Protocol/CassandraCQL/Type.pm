@@ -409,7 +409,8 @@ To or from an instance of L<Math::BigFloat>, or from a regular numeric scalar.
 
 =head2 TIMESTAMP
 
-To or from a numeric scalar, representing miliseconds since UNIX epoch.
+To or from a numeric scalar, representing a UNIX epoch timestamp as a float to
+the nearest milisecond.
 
 =head2 UUID, TIMEUUID
 

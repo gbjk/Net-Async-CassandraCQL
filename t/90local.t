@@ -36,7 +36,7 @@ $loop->add( $cass );
 
 $cass->connect( host => $CONFIG{host}, service => $CONFIG{port} )->get;
 
-$cass->query( "USE $CONFIG{keyspace}" )->get;
+$cass->use_keyspace( $CONFIG{keyspace} )->get;
 
 $cass->query( "CREATE TABLE tbl1 (key varchar PRIMARY KEY, t1 varchar, i1 int)" )->get;
 my $table = 1;

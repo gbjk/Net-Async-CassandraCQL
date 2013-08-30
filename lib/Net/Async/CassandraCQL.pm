@@ -42,7 +42,7 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
 
  $cass->connect->then( sub {
-    $cass->query( "USE my-keyspace" );
+    $cass->use_keyspace( "my-keyspace" )
  })->get;
 
 
@@ -456,6 +456,31 @@ sub execute
       $op == OPCODE_RESULT or return Future->new->fail( "Expected OPCODE_RESULT" );
       return _decode_result( $response );
    });
+}
+
+=head1 CONVENIENT WRAPPERS
+
+The following wrapper methods all wrap the basic C<query> operation.
+
+=cut
+
+=head2 $f = $cass->use_keyspace( $keyspace )
+
+A convenient shortcut to the C<USE $keyspace> query which escapes the keyspace
+name.
+
+=cut
+
+sub use_keyspace
+{
+   my $self = shift;
+   my ( $keyspace ) = @_;
+
+   # CQL's "quoting" handles any character except quote marks, which have to
+   # be doubled
+   $keyspace =~ s/"/""/g;
+
+   $self->query( qq(USE "$keyspace"), 0 );
 }
 
 package # hide from CPAN

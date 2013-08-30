@@ -34,8 +34,7 @@ $cassie->connect->get;
 my $keyspace;
 
 if( @ARGV ) {
-   my $want = shift @ARGV;
-   ( undef, $keyspace ) = $cassie->query( "USE $want;", CONSISTENCY_ONE )->get;
+   ( undef, $keyspace ) = $cassie->use_keyspace( shift @ARGV )->get;
 }
 
 while( defined( my $query = $term->readline(sprintf "\ncql%s> ", defined $keyspace ? ":$keyspace" : "") ) ) {

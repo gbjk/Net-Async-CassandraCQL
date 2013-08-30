@@ -145,10 +145,6 @@ sub typename
 Reimplement L<Protocol::CassandraCQL::Frame> in XS code for better
 performance.
 
-=item *
-
-More robust testing of data types, arguments to methods, etc...
-
 =back
 
 =cut

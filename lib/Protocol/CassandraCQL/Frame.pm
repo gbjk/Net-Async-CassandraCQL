@@ -8,7 +8,7 @@ package Protocol::CassandraCQL::Frame;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Encode qw( encode_utf8 decode_utf8 );
 

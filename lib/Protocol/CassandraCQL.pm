@@ -147,10 +147,6 @@ performance.
 
 =item *
 
-Codecs for TYPE_INET
-
-=item *
-
 More robust testing of data types, arguments to methods, etc...
 
 =back

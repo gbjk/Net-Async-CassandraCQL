@@ -243,7 +243,11 @@ sub decode {
    }
 }
 
-# TODO: INET
+# 4 (AF_INET) or 16 (AF_INET6) byte address
+package Protocol::CassandraCQL::Type::INET;
+use base qw( Protocol::CassandraCQL::Type );
+sub encode { $_[1] }
+sub decode { $_[1] }
 
 =head1 COLLECTION TYPES
 
@@ -349,7 +353,7 @@ To or from a numeric scalar.
 
 =head2 BLOB
 
-To or from an opaque string scalar or bytes.
+To or from an opaque string scalar of bytes.
 
 =head2 DECIMAL
 

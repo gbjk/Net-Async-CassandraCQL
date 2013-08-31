@@ -378,7 +378,7 @@ sub startup
 
    $self->send_message( OPCODE_STARTUP,
       Protocol::CassandraCQL::Frame->new->pack_string_map( {
-            CQL_VERSION => "3.0.0",
+            CQL_VERSION => "3.0.5",
       } )
    )->then( sub {
       my ( $op, $response ) = @_;

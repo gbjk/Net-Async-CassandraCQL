@@ -22,6 +22,8 @@ use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ColumnMeta;
 use Protocol::CassandraCQL::Result;
 
+use Net::Async::CassandraCQL::Query;
+
 use constant DEFAULT_CQL_PORT => 9042;
 
 =head1 NAME
@@ -496,82 +498,6 @@ sub use_keyspace
    $keyspace =~ s/"/""/g;
 
    $self->query( qq(USE "$keyspace"), 0 );
-}
-
-package # hide from CPAN
-   Net::Async::CassandraCQL::Query;
-use base qw( Protocol::CassandraCQL::ColumnMeta );
-use Carp;
-
-=head1 PREPARED QUERIES
-
-Prepared query objects are returned by C<prepare>, and have the following
-methods, in addition to those of its parent class,
-L<Protocol::CassandraCQL::ColumnMeta>.
-
-=cut
-
-sub from_frame
-{
-   my $class = shift;
-   my ( $cassandra, $response ) = @_;
-
-   my $id = $response->unpack_short_bytes;
-
-   my $self = $class->SUPER::from_frame( $response );
-
-   $self->{cassandra} = $cassandra;
-   $self->{id} = $id;
-
-   return $self;
-}
-
-=head2 $id = $query->id
-
-Returns the query ID.
-
-=cut
-
-sub id
-{
-   my $self = shift;
-   return $self->{id};
-}
-
-=head2 $f = $query->execute( $data, $consistency )
-
-Executes the query on the Cassandra connection object that created it,
-returning a future yielding the result the same way as the C<query> or
-C<execute> methods.
-
-The contents of the C<$data> reference will be encoded according to the types
-given in the underlying column metadata. C<$data> may be given as a positional
-ARRAY reference, or a named HASH reference where the keys give column names.
-
-=cut
-
-sub execute
-{
-   my $self = shift;
-   my ( $data, $consistency ) = @_;
-
-   my @data;
-   if( ref $data eq "ARRAY" ) {
-      @data = @$data;
-   }
-   elsif( ref $data eq "HASH" ) {
-      @data = ( undef ) x $self->columns;
-      foreach my $name ( keys %$data ) {
-         my $idx = $self->find_column( $name );
-         defined $idx or croak "Unknown bind column name '$name'";
-         defined $data[$idx] and croak "Cannot bind column ".$self->column_name($idx)." twice";
-         $data[$idx] = $data->{$name};
-      }
-   }
-
-   my @bytes = $self->encode_data( @data );
-
-   return $self->{cassandra}->execute( $self->id, \@bytes, $consistency );
 }
 
 =head1 TODO

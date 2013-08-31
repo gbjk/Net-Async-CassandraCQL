@@ -17,7 +17,7 @@ use Carp;
 
 use Future 0.13;
 
-use Protocol::CassandraCQL qw( :opcodes :results );
+use Protocol::CassandraCQL qw( :opcodes :results :consistencies );
 use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ColumnMeta;
 use Protocol::CassandraCQL::Result;
@@ -555,11 +555,84 @@ sub use_keyspace
    my $self = shift;
    my ( $keyspace ) = @_;
 
-   # CQL's "quoting" handles any character except quote marks, which have to
-   # be doubled
-   $keyspace =~ s/"/""/g;
+   $self->query( "USE " . $self->quote_identifier( $keyspace ), CONSISTENCY_ANY );
+}
 
-   $self->query( qq(USE "$keyspace"), 0 );
+=head2 $f = $cass->schema_keyspaces
+
+A shortcut to a C<SELECT> query on C<system.schema_keyspaces>, which returns a
+result object listing all the keyspaces.
+
+ ( $result ) = $f->get
+
+Exact details of the returned columns will depend on the Cassandra version,
+but the result should at least be keyed by the first column, called
+C<keyspace_name>.
+
+ my $keyspaces = $result->rowmap_hash( "keyspace_name" )
+
+=cut
+
+sub schema_keyspaces
+{
+   my $self = shift;
+
+   $self->query_rows(
+      "SELECT * FROM system.schema_keyspaces",
+      CONSISTENCY_ONE
+   );
+}
+
+=head2 $f = $cass->schema_columnfamilies( $keyspace )
+
+A shortcut to a C<SELECT> query on C<system.schema_columnfamilies>, which
+returns a result object listing all the columnfamilies of the given keyspace.
+
+ ( $result ) = $f->get
+
+Exact details of the returned columns will depend on the Cassandra version,
+but the result should at least be keyed by the first column, called
+C<columnfamily_name>.
+
+ my $columnfamilies = $result->rowmap_hash( "columnfamily_name" )
+
+=cut
+
+sub schema_columnfamilies
+{
+   my $self = shift;
+   my ( $keyspace ) = @_;
+
+   $self->query_rows(
+      "SELECT * FROM system.schema_columnfamilies WHERE keyspace_name = " . $self->quote( $keyspace ),
+      CONSISTENCY_ONE
+   );
+}
+
+=head2 $f = $cass->schema_columns( $keyspace, $columnfamily )
+
+A shortcut to a C<SELECT> query on C<system.schema_columns>, which returns a
+result object listing all the columns of the given columnfamily.
+
+ ( $result ) = $f->get
+
+Exact details of the returned columns will depend on the Cassandra version,
+but the result should at least be keyed by the first column, called
+C<column_name>.
+
+ my $columns = $result->rowmap_hash( "column_name" )
+
+=cut
+
+sub schema_columns
+{
+   my $self = shift;
+   my ( $keyspace, $columnfamily ) = @_;
+
+   $self->query_rows(
+      "SELECT * FROM system.schema_columns WHERE keyspace_name = " . $self->quote( $keyspace ) . " AND columnfamily_name = " . $self->quote( $columnfamily ),
+      CONSISTENCY_ONE,
+   );
 }
 
 =head1 TODO

@@ -416,6 +416,28 @@ sub query
    });
 }
 
+=head2 $f = $cass->query_rows( $cql, $consistency )
+
+A shortcut wrapper for C<query> which expects a C<rows> result and returns it
+directly. Any other result is treated as an error. The returned Future returns
+a C<Protocol::CassandraCQL::Result> directly
+
+ $result = $f->get
+
+=cut
+
+sub query_rows
+{
+   my $self = shift;
+   my ( $cql, $consistency ) = @_;
+
+   $self->query( $cql, $consistency )->then( sub {
+      my ( $type, $result ) = @_;
+      $type eq "rows" or Future->new->fail( "Expected 'rows' result" );
+      Future->new->done( $result );
+   });
+}
+
 =head2 $f = $cass->prepare( $cql )
 
 Prepares a CQL query for later execution. On success, the returned Future

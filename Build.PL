@@ -16,6 +16,7 @@ my $build = Module::Build->new(
       'Math::BigInt' => 0,
       'IO::Async::Loop' => '0.54', # ->connect returns Future
       'IO::Async::Protocol::Stream' => 0,
+      'IO::Socket::IP' => 0,
    },
    build_requires => {
       'IO::Async::Test' => 0,

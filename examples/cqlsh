@@ -4,8 +4,8 @@ use strict;
 use warnings;
 use 5.010;
 
-use IO::Async::Loop;
-use Net::Async::CassandraCQL;
+use Protocol::CassandraCQL::Client;
+use Protocol::CassandraCQL qw( CONSISTENCY_ONE :types );
 
 use Getopt::Long;
 use List::Util qw( max );
@@ -15,38 +15,33 @@ use Term::ReadLine;
 
 use Data::Dump 'pp';
 
-use Protocol::CassandraCQL qw( CONSISTENCY_ONE :types );
-
 GetOptions(
    'host|h=s' => \(my $HOST = "localhost"),
 ) or exit 1;
 
-my $loop = IO::Async::Loop->new;
-my $cassie = Net::Async::CassandraCQL->new(
-   host => $HOST,
+my $cassie = Protocol::CassandraCQL::Client->new(
+   PeerHost => $HOST,
 );
-$loop->add( $cassie );
 
 my $term = Term::ReadLine->new( "cqlsh" );
-
-$cassie->connect->get;
 
 my $keyspace;
 
 if( @ARGV ) {
-   ( undef, $keyspace ) = $cassie->use_keyspace( shift @ARGV )->get;
+   ( undef, $keyspace ) = $cassie->use_keyspace( shift @ARGV );
 }
 
 while( defined( my $query = $term->readline(sprintf "\ncql%s> ", defined $keyspace ? ":$keyspace" : "") ) ) {
-   my $f = $cassie->query( $query, CONSISTENCY_ONE );
-   $f->await;
+   my ( $type, $result );
+   my $e = eval {
+      ( $type, $result ) = $cassie->query( $query, CONSISTENCY_ONE );
+      1;
+   } ? undef : $@;
 
-   if( $f->failure ) {
-      print $f->failure . "\n";
+   if( $e ) {
+      print "$e\n";
       next;
    }
-
-   my ( $type, $result ) = $f->get or next;
 
    if( $type eq "keyspace" ) {
       $keyspace = $result;

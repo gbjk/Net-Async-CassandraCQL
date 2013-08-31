@@ -131,6 +131,46 @@ sub configure
 
 =cut
 
+=head2 $str = $cass->quote( $str )
+
+Quotes a string argument suitable for inclusion in an immediate CQL query
+string.
+
+In general, it is better to use a prepared query and pass the value as an
+execute parameter though.
+
+=cut
+
+sub quote
+{
+   my $self = shift;
+   my ( $str ) = @_;
+
+   # CQL's 'quoting' handles any character except quote marks, which have to
+   # be doubled
+   $str =~ s/'/''/g;
+   return qq('$str');
+}
+
+=head2 $str = $cass->quote_identifier( $str )
+
+Quotes an identifier name suitable for inclusion in a CQL query string.
+
+=cut
+
+sub quote_identifier
+{
+   my $self = shift;
+   my ( $str ) = @_;
+
+   return $str if $str =~ m/^[a-z_][a-z0-9_]+$/;
+
+   # CQL's "quoting" handles any character except quote marks, which have to
+   # be doubled
+   $str =~ s/"/""/g;
+   return qq("$str");
+}
+
 # function
 sub _decode_result
 {

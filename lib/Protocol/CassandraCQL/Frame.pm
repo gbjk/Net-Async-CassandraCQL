@@ -90,6 +90,30 @@ sub parse
    return ( $version, $flags, $streamid, $opcode, $frame );
 }
 
+=head2 ( $version, $flags, $streamid, $opcode, $frame ) = Protocol::CassandraCQL::Frame->recv( $fh )
+
+Attempts to read a complete frame from the given filehandle, blocking until it
+is available. If an IO error happens, returns an empty list. The results are
+undefined if this method is called on a non-blocking filehandle.
+
+=cut
+
+sub recv
+{
+   my $class = shift;
+   my ( $fh ) = @_;
+
+   $fh->read( my $header, 8 ) or return;
+   my ( $version, $flags, $streamid, $opcode, $bodylen ) = unpack( "C C C C N", $header );
+
+   my $body = "";
+   $fh->read( $body, $bodylen ) or return if $bodylen;
+
+   my $frame = $class->new( $body );
+
+   return ( $version, $flags, $streamid, $opcode, $frame );
+}
+
 =head1 METHODS
 
 =cut

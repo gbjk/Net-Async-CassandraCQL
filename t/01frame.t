@@ -135,4 +135,20 @@ is( Protocol::CassandraCQL::Frame->new->bytes, "", '->bytes empty' );
               '$frame->build' );
 }
 
+# recv
+{
+   pipe( my $rd, my $wr ) or die "Cannot pipe() - $!";
+   $wr->syswrite( "\x81\x00\x02\x07\0\0\0\4\0\2Hi" );
+
+   my ( $version, $flags, $streamid, $opcode, $frame ) =
+      Protocol::CassandraCQL::Frame->recv( $rd );
+
+   is( $version, 0x81, '$version from ->recv' );
+   is( $flags,   0x00, '$flags from ->recv' );
+   is( $streamid,   2, '$streamid from ->recv' );
+   is( $opcode,     7, '$opcode from ->recv' );
+
+   is( $frame->unpack_string, "Hi", '$frame->unpack_string from ->recv' );
+}
+
 done_testing;

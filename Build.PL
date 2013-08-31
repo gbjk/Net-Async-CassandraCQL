@@ -14,11 +14,11 @@ my $build = Module::Build->new(
       'Encode' => 0,
       'Future' => '0.13',
       'Math::BigInt' => 0,
+      'IO::Async::Loop' => '0.54', # ->connect returns Future
       'IO::Async::Protocol::Stream' => 0,
    },
    build_requires => {
       'IO::Async::Test' => 0,
-      'IO::Async::Loop' => 0,
       'Test::HexString' => 0,
       'Test::Fatal' => 0,
       'Test::More' => '0.88', # done_testing

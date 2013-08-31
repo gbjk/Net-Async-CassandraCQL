@@ -649,10 +649,6 @@ Support frame compression
 
 =item *
 
-Move L<Protocol::CassandraCQL> to its own distribution
-
-=item *
-
 Allow storing multiple Cassandra node hostnames and perform some kind of
 balancing or failover of connections.
 

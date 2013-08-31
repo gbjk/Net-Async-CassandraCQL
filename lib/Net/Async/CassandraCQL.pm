@@ -192,7 +192,7 @@ sub connect
       $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } ) )
       ->and_then( sub {
          $self->startup
-      })->then( sub {
+      })->and_then( sub {
          my $f = shift;
          return $f unless defined $keyspace;
 

@@ -78,6 +78,29 @@ behaviours and limits of its ability to communicate with Cassandra.
 
 =cut
 
+=head1 EVENTS
+
+=head2 on_event $name, @args
+
+A registered event occurred. C<@args> will depend on the event name. Each
+is also available as its own event, with the name in lowercase. If the event
+is not one of the types recognised below, C<@args> will contain the actual
+L<Protocol::CassandraCQL::Frame> object.
+
+=head2 on_topology_change $type, $node
+
+The cluster topology has changed. C<$node> is a packed socket address.
+
+=head2 on_status_change $status, $node
+
+The node's status has changed. C<$node> is a packed socket address.
+
+=head2 on_schema_change $type, $keyspace, $table
+
+A keyspace or table schema has changed.
+
+=cut
+
 =head1 PARAMETERS
 
 The following named parameters may be passed to C<new> or C<configure>:
@@ -126,7 +149,8 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( host service username password keyspace default_consistency )) {
+   foreach (qw( host service username password keyspace default_consistency 
+                on_event on_topology_change on_status_change on_schema_change )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -283,11 +307,43 @@ sub on_read
       my $message = $frame->unpack_string;
       $self->fail_all_and_close( "OPCODE_ERROR: $message\n", $err, $frame );
    }
+   elsif( $streamid == 0xff and $opcode == OPCODE_EVENT ) {
+      $self->_event( $frame );
+   }
    else {
       print STDERR "Received a message opcode=$opcode for unknown stream $streamid\n";
    }
 
    return 1;
+}
+
+sub _event
+{
+   my $self = shift;
+   my ( $frame ) = @_;
+
+   my $name = $frame->unpack_string;
+
+   my @args;
+   if( $name eq "TOPOLOGY_CHANGE" ) {
+      push @args, $frame->unpack_string; # type
+      push @args, $frame->unpack_inet;   # node
+   }
+   elsif( $name eq "STATUS_CHANGE" ) {
+      push @args, $frame->unpack_string; # status
+      push @args, $frame->unpack_inet;   # node
+   }
+   elsif( $name eq "SCHEMA_CHANGE" ) {
+      push @args, $frame->unpack_string; # type
+      push @args, $frame->unpack_string; # keyspace
+      push @args, $frame->unpack_string; # table
+   }
+   else {
+       push @args, $frame;
+   }
+
+   $self->maybe_invoke_event( "on_".lc($name), @args )
+      or $self->maybe_invoke_event( on_event => $name, @args );
 }
 
 sub on_closed
@@ -583,6 +639,29 @@ sub execute
    });
 }
 
+=head2 $f = $cass->register( $events )
+
+Registers the connection's interest in receiving events of the types given in
+the ARRAY reference. Event names may be C<TOPOLOGY_CHANGE>, C<STATUS_CHANGE>
+or C<SCHEMA_CHANGE>. On success, the returned Future yields nothing.
+
+=cut
+
+sub register
+{
+   my $self = shift;
+   my ( $events ) = @_;
+
+   $self->send_message( OPCODE_REGISTER,
+      Protocol::CassandraCQL::Frame->new->pack_string_list( $events )
+   )->then( sub {
+      my ( $op, $response ) = @_;
+      $op == OPCODE_READY or Future->new->fail( "Expected OPCODE_READY" );
+
+      return Future->new->done;
+   });
+}
+
 =head1 CONVENIENT WRAPPERS
 
 The following wrapper methods all wrap the basic C<query> operation.
@@ -684,10 +763,6 @@ sub schema_columns
 =head1 TODO
 
 =over 8
-
-=item *
-
-Handle OPCODE_REGISTER/OPCODE_EVENT
 
 =item *
 

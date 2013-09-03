@@ -256,6 +256,8 @@ sub on_read
 
    # TODO: flags
    if( my $f = $self->{streams}[$streamid] ) {
+      undef $self->{streams}[$streamid];
+
       if( $opcode == OPCODE_ERROR ) {
          my $err     = $frame->unpack_int;
          my $message = $frame->unpack_string;
@@ -264,8 +266,6 @@ sub on_read
       else {
          $f->done( $opcode, $frame );
       }
-
-      undef $self->{streams}[$streamid];
 
       if( my $next = shift @{ $self->{pending} } ) {
          my ( $opcode, $frame, $f ) = @$next;

@@ -272,6 +272,11 @@ sub on_read
          $self->_send( $opcode, $streamid, $frame, $f );
       }
    }
+   elsif( $streamid == 0 and $opcode == OPCODE_ERROR ) {
+      my $err     = $frame->unpack_int;
+      my $message = $frame->unpack_string;
+      $self->fail_all_and_close( "OPCODE_ERROR: $message\n", $err, $frame );
+   }
    else {
       print STDERR "Received a message opcode=$opcode for unknown stream $streamid\n";
    }

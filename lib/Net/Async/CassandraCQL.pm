@@ -92,6 +92,12 @@ The hostname of the Cassandra node to connect to
 
 Optional. The service name or port number to connect to.
 
+=item username => STRING
+
+=item password => STRING
+
+Optional. Authentication details to use for C<PasswordAuthenticator>.
+
 =item keyspace => STRING
 
 Optional. If set, a C<USE keyspace> query will be issued as part of the
@@ -120,7 +126,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( host service keyspace default_consistency )) {
+   foreach (qw( host service username password keyspace default_consistency )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -387,10 +393,45 @@ sub startup
       } )
    )->then( sub {
       my ( $op, $response ) = @_;
-      $op == OPCODE_READY or return $self->fail_all_and_close( "Expected OPCODE_READY" );
 
-      return Future->new->done;
+      if( $op == OPCODE_READY ) {
+         return Future->new->done;
+      }
+      elsif( $op == OPCODE_AUTHENTICATE ) {
+         return $self->_authenticate( $response->unpack_string );
+      }
+      else {
+         return $self->fail_all_and_close( "Expected OPCODE_READY or OPCODE_AUTHENTICATE" );
+      }
    });
+}
+
+sub _authenticate
+{
+   my $self = shift;
+   my ( $authenticator ) = @_;
+
+   if( $authenticator eq "org.apache.cassandra.auth.PasswordAuthenticator" ) {
+      foreach (qw( username password )) {
+         defined $self->{$_} or croak "Cannot authenticate by password without $_";
+      }
+
+      $self->send_message( OPCODE_CREDENTIALS,
+         Protocol::CassandraCQL::Frame->new->pack_string_map( {
+            username => $self->{username},
+            password => $self->{password},
+         }
+      )
+      )->then( sub {
+         my ( $op, $response ) = @_;
+         $op == OPCODE_READY or return $self->fail_all_and_close( "Expected OPCODE_READY" );
+
+         return Future->new->done;
+      });
+   }
+   else {
+      return $self->fail_all_and_close( "Unrecognised authenticator $authenticator" );
+   }
 }
 
 =head2 $f = $cass->options
@@ -646,7 +687,7 @@ sub schema_columns
 
 =item *
 
-Handle OPCODE_AUTHENTICATE and OPCODE_REGISTER
+Handle OPCODE_REGISTER/OPCODE_EVENT
 
 =item *
 

@@ -760,6 +760,50 @@ sub schema_columns
    );
 }
 
+=head2 $f = $cass->local_info
+
+A shortcut to a C<SELECT> query on C<system.local> and returning the (only)
+row in the result as a HASH reference.
+
+ ( $local ) = $f->get
+
+=cut
+
+sub local_info
+{
+   my $self = shift;
+
+   $self->query_rows(
+      "SELECT * FROM system.local",
+      CONSISTENCY_ONE,
+   )->then( sub {
+      my ( $result ) = @_;
+      return Future->new->done( $result->row_hash( 0 ) )
+   });
+}
+
+=head2 $f = $cass->peers_info
+
+A shortcut to a C<SELECT> query on C<system.peers> and returning the rows in
+the result as a rowmap keyed by <TODO>.
+
+ $peermap = $f->get
+
+=cut
+
+sub peers_info
+{
+   my $self = shift;
+
+   $self->query_rows(
+      "SELECT * FROM system.peers",
+      CONSISTENCY_ONE,
+   )->then( sub {
+      my ( $result ) = @_;
+      return Future->new->done( [ $result->rows_hash ] )
+   });
+}
+
 =head1 TODO
 
 =over 8

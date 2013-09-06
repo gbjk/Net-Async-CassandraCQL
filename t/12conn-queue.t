@@ -20,7 +20,6 @@ my ( $S1, $S2 ) = IO::Async::OS->socketpair() or die "Cannot create socket pair 
 
 my $conn = Net::Async::CassandraCQL::Connection->new(
    transport => IO::Async::Stream->new( handle => $S1 ),
-   default_consistency => CONSISTENCY_ANY,
 );
 $loop->add( $conn );
 
@@ -49,7 +48,7 @@ $loop->add( IO::Async::Stream->new(
 ) );
 
 # Fire off 127 queries, queue the remainder
-my @f = map { $conn->query( "INSERT INTO t (v) = $_" ) } 1 .. 1000;
+my @f = map { $conn->query( "INSERT INTO t (v) = $_", CONSISTENCY_ANY ) } 1 .. 1000;
 
 # Wait on success from all
 Future->needs_all( @f )->get;

@@ -88,11 +88,6 @@ Optional. Authentication details to use for C<PasswordAuthenticator>.
 Optional. If set, a C<USE keyspace> query will be issued as part of the
 connect method.
 
-=item default_consistency => INT
-
-Optional. Default consistency level to use if none is provided to C<query> or
-C<execute>.
-
 =back
 
 =cut
@@ -111,7 +106,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( host service username password keyspace default_consistency 
+   foreach (qw( host service username password keyspace
                 on_event on_topology_change on_status_change on_schema_change )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
@@ -467,9 +462,6 @@ sub query
    my $self = shift;
    my ( $cql, $consistency ) = @_;
 
-   $consistency //= $self->{default_consistency};
-   defined $consistency or croak "'query' needs a consistency level";
-
    $self->send_message( OPCODE_QUERY,
       Protocol::CassandraCQL::Frame->new->pack_lstring( $cql )
                                         ->pack_short( $consistency )
@@ -523,9 +515,6 @@ sub execute
 {
    my $self = shift;
    my ( $id, $data, $consistency ) = @_;
-
-   $consistency //= $self->{default_consistency};
-   defined $consistency or croak "'execute' needs a consistency level";
 
    my $frame = Protocol::CassandraCQL::Frame->new
       ->pack_short_bytes( $id )

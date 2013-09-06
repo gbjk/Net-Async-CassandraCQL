@@ -13,6 +13,8 @@ our $VERSION = '0.05';
 
 use base qw( IO::Async::Notifier );
 
+use Carp;
+
 use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
 
 use Net::Async::CassandraCQL::Query;
@@ -194,7 +196,7 @@ sub connect
 
    ( $self->{conn} ||= do {
          my $conn = Net::Async::CassandraCQL::Connection->new(
-            map { $_ => $self->{$_} } qw( host service username password keyspace default_consistency )
+            map { $_ => $self->{$_} } qw( host service username password keyspace )
          );
          $self->add_child( $conn );
          $conn;
@@ -226,7 +228,12 @@ returns nothing.
 sub query
 {
    my $self = shift;
-   $self->{conn}->query( @_ );
+   my ( $cql, $consistency ) = @_;
+
+   $consistency //= $self->{default_consistency};
+   defined $consistency or croak "'query' needs a consistency level";
+
+   $self->{conn}->query( $cql, $consistency );
 }
 
 =head2 $f = $cass->query_rows( $cql, $consistency )
@@ -287,7 +294,12 @@ correctly.
 sub execute
 {
    my $self = shift;
-   $self->{conn}->execute( @_ );
+   my ( $id, $data, $consistency ) = @_;
+
+   $consistency //= $self->{default_consistency};
+   defined $consistency or croak "'execute' needs a consistency level";
+
+   $self->{conn}->execute( $id, $data, $consistency );
 }
 
 =head1 CONVENIENT WRAPPERS

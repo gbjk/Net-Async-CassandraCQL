@@ -195,27 +195,6 @@ $loop->add( $conn );
               '->query DROP TABLE returns schema change' );
 }
 
-# ->query using default_consistency
-{
-   $conn->configure( default_consistency => CONSISTENCY_TWO );
-
-   my $f = $conn->query( "SELECT * FROM things" );
-
-   my $stream = "";
-   wait_for_stream { length $stream >= 8 + 26 } $S2 => $stream;
-
-   # OPCODE_QUERY
-   is_hexstr( $stream,
-              "\x01\x00\x01\x07\0\0\0\x1a" .
-                 "\0\0\0\x14SELECT * FROM things\0\2",
-              'stream after ->query using default_consistency' );
-
-   # OPCODE_RESULT - void but we don't care
-   $S2->syswrite( "\x81\x00\x01\x08\0\0\0\4\0\0\0\0" );
-
-   wait_for { $f->is_ready };
-}
-
 # ->prepare and ->execute
 {
    my $f = $conn->prepare( "INSERT INTO t (f) = (?)" );

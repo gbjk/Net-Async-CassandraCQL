@@ -175,10 +175,6 @@ Takes the following named arguments:
 
 =item service => STRING
 
-=item keyspace => STRING
-
-Optional. Overrides the configured values.
-
 =back
 
 A host name is required, either as a named argument or as a configured value
@@ -192,7 +188,7 @@ sub connect
    my $self = shift;
    my %args = @_;
 
-   my $keyspace = $args{keyspace} // $self->{keyspace};
+   my $keyspace = $self->{keyspace};
 
    ( $self->{conn} ||= do {
          my $conn = Net::Async::CassandraCQL::Connection->new(

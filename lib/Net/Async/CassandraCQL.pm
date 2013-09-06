@@ -17,6 +17,7 @@ use Carp;
 
 use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
 
+use Net::Async::CassandraCQL::Connection;
 use Net::Async::CassandraCQL::Query;
 
 =head1 NAME
@@ -190,9 +191,6 @@ sub connect
 {
    my $self = shift;
    my %args = @_;
-
-   # Must be late
-   require Net::Async::CassandraCQL::Connection;
 
    my $keyspace = $args{keyspace} // $self->{keyspace};
 

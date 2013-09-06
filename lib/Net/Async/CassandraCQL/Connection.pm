@@ -24,12 +24,6 @@ use Protocol::CassandraCQL::Result;
 
 use constant DEFAULT_CQL_PORT => 9042;
 
-use Net::Async::CassandraCQL;
-foreach (qw( quote quote_identifier )) {
-   no strict 'refs';
-   *$_ = Net::Async::CassandraCQL->can( $_ );
-}
-
 =head1 NAME
 
 C<Net::Async::CassandraCQL::Connection> - connect to a single Cassandra database node

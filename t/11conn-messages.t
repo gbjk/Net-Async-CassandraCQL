@@ -11,7 +11,7 @@ use IO::Async::OS;
 use IO::Async::Loop;
 use IO::Async::Stream;
 
-use Net::Async::CassandraCQL;
+use Net::Async::CassandraCQL::Connection;
 use Protocol::CassandraCQL qw( CONSISTENCY_ANY CONSISTENCY_ONE CONSISTENCY_TWO );
 
 my $loop = IO::Async::Loop->new();
@@ -19,15 +19,15 @@ testing_loop( $loop );
 
 my ( $S1, $S2 ) = IO::Async::OS->socketpair() or die "Cannot create socket pair - $!";
 
-my $cass = Net::Async::CassandraCQL->new(
+my $conn = Net::Async::CassandraCQL::Connection->new(
    transport => IO::Async::Stream->new( handle => $S1 )
 );
 
-$loop->add( $cass );
+$loop->add( $conn );
 
 # ->startup
 {
-   my $f = $cass->startup;
+   my $f = $conn->startup;
 
    my $stream = "";
    wait_for_stream { length $stream >= 8 + 22 } $S2 => $stream;
@@ -46,9 +46,9 @@ $loop->add( $cass );
    is_deeply( [ $f->get ], [],
               '->startup->get returns nothing' );
 
-   $cass->configure( username => "the-user", password => "the-pass" );
+   $conn->configure( username => "the-user", password => "the-pass" );
 
-   $f = $cass->startup;
+   $f = $conn->startup;
 
    $stream = "";
    wait_for_stream { length $stream >= 8 + 22 } $S2 => $stream;
@@ -78,7 +78,7 @@ $loop->add( $cass );
 
 # ->options
 {
-   my $f = $cass->options;
+   my $f = $conn->options;
 
    my $stream = "";
    wait_for_stream { length $stream >= 8 } $S2 => $stream;
@@ -102,7 +102,7 @@ $loop->add( $cass );
 
 # ->query returning void
 {
-   my $f = $cass->query( "INSERT INTO things (name) VALUES ('thing')", CONSISTENCY_ANY );
+   my $f = $conn->query( "INSERT INTO things (name) VALUES ('thing')", CONSISTENCY_ANY );
 
    my $stream = "";
    wait_for_stream { length $stream >= 8 + 48 } $S2 => $stream;
@@ -124,7 +124,7 @@ $loop->add( $cass );
 
 # ->query returning rows
 {
-   my $f = $cass->query( "SELECT a,b FROM c", CONSISTENCY_ONE );
+   my $f = $conn->query( "SELECT a,b FROM c", CONSISTENCY_ONE );
 
    my $stream = "";
    wait_for_stream { length $stream >= 8 + 23 } $S2 => $stream;
@@ -153,7 +153,7 @@ $loop->add( $cass );
 
 # ->query returning set_keyspace
 {
-   my $f = $cass->query( "USE test", CONSISTENCY_ANY );
+   my $f = $conn->query( "USE test", CONSISTENCY_ANY );
 
    my $stream = "";
    wait_for_stream { length $stream >= 8 + 12 } $S2 => $stream;
@@ -175,7 +175,7 @@ $loop->add( $cass );
 
 # ->query returning schema_change
 {
-   my $f = $cass->query( "DROP TABLE users", CONSISTENCY_ANY );
+   my $f = $conn->query( "DROP TABLE users", CONSISTENCY_ANY );
 
    my $stream = "";
    wait_for_stream { length $stream >= 8 + 20 } $S2 => $stream;
@@ -197,9 +197,9 @@ $loop->add( $cass );
 
 # ->query using default_consistency
 {
-   $cass->configure( default_consistency => CONSISTENCY_TWO );
+   $conn->configure( default_consistency => CONSISTENCY_TWO );
 
-   my $f = $cass->query( "SELECT * FROM things" );
+   my $f = $conn->query( "SELECT * FROM things" );
 
    my $stream = "";
    wait_for_stream { length $stream >= 8 + 26 } $S2 => $stream;
@@ -218,7 +218,7 @@ $loop->add( $cass );
 
 # ->prepare and ->execute
 {
-   my $f = $cass->prepare( "INSERT INTO t (f) = (?)" );
+   my $f = $conn->prepare( "INSERT INTO t (f) = (?)" );
 
    my $stream = "";
    wait_for_stream { length $stream >= 8 + 27 } $S2 => $stream;
@@ -243,7 +243,7 @@ $loop->add( $cass );
    is( $query->column_type(0)->name, "VARCHAR", '$query->column_type(0)->name' );
 
    # ->execute directly
-   $f = $cass->execute( "0123456789ABCDEF", [ "more-data" ], CONSISTENCY_ANY );
+   $f = $conn->execute( "0123456789ABCDEF", [ "more-data" ], CONSISTENCY_ANY );
 
    $stream = "";
    wait_for_stream { length $stream >= 8 + 35 } $S2 => $stream;

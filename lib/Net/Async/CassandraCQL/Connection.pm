@@ -77,11 +77,6 @@ Optional. The service name or port number to connect to.
 
 Optional. Authentication details to use for C<PasswordAuthenticator>.
 
-=item keyspace => STRING
-
-Optional. If set, a C<USE keyspace> query will be issued as part of the
-connect method.
-
 =back
 
 =cut
@@ -100,7 +95,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( host service username password keyspace
+   foreach (qw( host service username password
                 on_event on_topology_change on_status_change on_schema_change )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }

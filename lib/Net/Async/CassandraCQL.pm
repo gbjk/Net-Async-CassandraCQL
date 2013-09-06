@@ -196,7 +196,7 @@ sub connect
 
    ( $self->{conn} ||= do {
          my $conn = Net::Async::CassandraCQL::Connection->new(
-            map { $_ => $self->{$_} } qw( host service username password keyspace )
+            map { $_ => $self->{$_} } qw( host service username password )
          );
          $self->add_child( $conn );
          $conn;

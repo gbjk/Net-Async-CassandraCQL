@@ -434,6 +434,23 @@ sub peers_info
    });
 }
 
+=head1 TODO
+
+=over 8
+
+=item *
+
+Support frame compression
+
+=item *
+
+Allow storing multiple Cassandra node hostnames and perform some kind of
+balancing or failover of connections.
+
+=back
+
+=cut
+
 =head1 SPONSORS
 
 This code was paid for by

@@ -155,10 +155,6 @@ Takes the following named arguments:
 
 =item service => STRING
 
-=item keyspace => STRING
-
-Optional. Overrides the configured values.
-
 =back
 
 A host name is required, either as a named argument or as a configured value
@@ -175,17 +171,10 @@ sub connect
    $args{host}    //= $self->{host}    or croak "Require 'host'";
    $args{service} //= $self->{service} // DEFAULT_CQL_PORT;
 
-   my $keyspace = $args{keyspace} // $self->{keyspace};
-
    return ( $self->{connect_f} ||=
       $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } ) )
       ->and_then( sub {
          $self->startup
-      })->and_then( sub {
-         my $f = shift;
-         return $f unless defined $keyspace;
-
-         $self->use_keyspace( $keyspace );
       });
 }
 
@@ -550,21 +539,6 @@ sub register
 
       return Future->new->done;
    });
-}
-
-=head2 $f = $conn->use_keyspace( $keyspace )
-
-A convenient shortcut to the C<USE $keyspace> query which escapes the keyspace
-name.
-
-=cut
-
-sub use_keyspace
-{
-   my $self = shift;
-   my ( $keyspace ) = @_;
-
-   $self->query( "USE " . $self->quote_identifier( $keyspace ), CONSISTENCY_ANY );
 }
 
 =head1 TODO

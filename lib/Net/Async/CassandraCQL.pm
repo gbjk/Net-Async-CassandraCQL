@@ -194,13 +194,20 @@ sub connect
    # Must be late
    require Net::Async::CassandraCQL::Connection;
 
+   my $keyspace = $args{keyspace} // $self->{keyspace};
+
    ( $self->{conn} ||= do {
          my $conn = Net::Async::CassandraCQL::Connection->new(
             map { $_ => $self->{$_} } qw( host service username password keyspace )
          );
          $self->add_child( $conn );
          $conn;
-   } )->connect( %args );
+   } )->connect( %args )->and_then( sub {
+      my $f = shift;
+      return $f unless defined $keyspace;
+
+      $self->query( "USE " . $self->quote_identifier( $keyspace ), CONSISTENCY_ONE );
+   });
 }
 
 =head2 $f = $cass->query( $cql, $consistency )

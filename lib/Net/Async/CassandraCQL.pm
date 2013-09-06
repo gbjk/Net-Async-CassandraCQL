@@ -237,6 +237,16 @@ sub connect
    });
 }
 
+sub _get_a_node
+{
+   my $self = shift;
+
+   # Future 0.16 doesn't support immediate->followed_by( subclass ) correctly
+   # return Future->new->done( $self->{conn} );
+
+   return $self->loop->new_future->done( $self->{conn} );
+}
+
 =head2 $f = $cass->query( $cql, $consistency )
 
 Performs a CQL query. On success, the values returned from the Future will
@@ -267,7 +277,9 @@ sub query
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'query' needs a consistency level";
 
-   $self->{conn}->query( $cql, $consistency );
+   $self->_get_a_node->then( sub {
+      shift->query( $cql, $consistency );
+   });
 }
 
 =head2 $f = $cass->query_rows( $cql, $consistency )
@@ -306,7 +318,9 @@ sub prepare
    my $self = shift;
    my ( $cql ) = @_;
 
-   $self->{conn}->prepare( $cql )->then( sub {
+   $self->_get_a_node->then( sub {
+      shift->prepare( $cql )
+   })->then( sub {
       my ( $frame ) = @_;
 
       return Future->new->done( Net::Async::CassandraCQL::Query->from_frame( $self, $frame ) );
@@ -333,7 +347,9 @@ sub execute
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'execute' needs a consistency level";
 
-   $self->{conn}->execute( $id, $data, $consistency );
+   $self->_get_a_node->then( sub {
+      shift->execute( $id, $data, $consistency );
+   });
 }
 
 =head1 CONVENIENT WRAPPERS

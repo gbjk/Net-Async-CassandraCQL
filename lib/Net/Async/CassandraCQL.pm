@@ -185,6 +185,39 @@ used instead.
 
 =cut
 
+# ->_connect_node( $host, $service ) ==> $conn
+# Its own method to allow mocking during unit testing
+sub _connect_node
+{
+   my $self = shift;
+   my ( $host, $service ) = @_;
+
+   my $conn = Net::Async::CassandraCQL::Connection->new(
+      on_closed => sub {
+         my $node = shift;
+         $self->remove_child( $node );
+         $self->_closed_node( $node );
+      },
+      map { $_ => $self->{$_} } qw( username password ),
+   );
+   $self->add_child( $conn );
+
+   $conn->connect(
+      host    => $host,
+      service => $service,
+   )->on_fail( sub {
+      $self->remove_child( $conn )
+   });
+}
+
+sub _closed_node
+{
+   my $self = shift;
+   my ( $node ) = @_;
+
+   delete $self->{conn};
+}
+
 sub connect
 {
    my $self = shift;
@@ -192,21 +225,15 @@ sub connect
 
    my $keyspace = $self->{keyspace};
 
-   ( $self->{conn} ||= do {
-         my $conn = Net::Async::CassandraCQL::Connection->new(
-            username => $self->{username},
-            password => $self->{password},
-         );
-         $self->add_child( $conn );
-         $conn;
-   } )->connect(
-      host    => $args{host}    // $self->{host},
-      service => $args{service} // $self->{service} // DEFAULT_CQL_PORT,
-   )->and_then( sub {
-      my $f = shift;
-      return $f unless defined $keyspace;
+   $self->_connect_node(
+      $args{host}    // $self->{host},
+      $args{service} // $self->{service} // DEFAULT_CQL_PORT,
+   )->then( sub {
+      my ( $conn ) = @_;
+      $self->{conn} = $conn;
 
-      $self->query( "USE " . $self->quote_identifier( $keyspace ), CONSISTENCY_ONE );
+      return Future->new->done unless defined $keyspace;
+      $conn->query( "USE " . $self->quote_identifier( $keyspace ), CONSISTENCY_ONE );
    });
 }
 

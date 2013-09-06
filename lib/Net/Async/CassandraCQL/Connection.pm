@@ -124,7 +124,9 @@ sub _decode_result
 =head2 $f = $conn->connect( %args )
 
 Connects to the Cassandra node an send the C<OPCODE_STARTUP> message. The
-returned Future will yield nothing on success.
+returned Future will yield the connection itself on success.
+
+ ( $conn ) = $f->get
 
 Takes the following named arguments:
 
@@ -147,7 +149,7 @@ sub connect
       $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } ) )
       ->and_then( sub {
          $self->startup
-      });
+      })->then( sub { Future->new->done( $self ) });
 }
 
 sub on_read

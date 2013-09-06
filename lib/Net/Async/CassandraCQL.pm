@@ -20,6 +20,8 @@ use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
 use Net::Async::CassandraCQL::Connection;
 use Net::Async::CassandraCQL::Query;
 
+use constant DEFAULT_CQL_PORT => 9042;
+
 =head1 NAME
 
 C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQL
@@ -192,11 +194,15 @@ sub connect
 
    ( $self->{conn} ||= do {
          my $conn = Net::Async::CassandraCQL::Connection->new(
-            map { $_ => $self->{$_} } qw( host service username password )
+            username => $self->{username},
+            password => $self->{password},
          );
          $self->add_child( $conn );
          $conn;
-   } )->connect( %args )->and_then( sub {
+   } )->connect(
+      host    => $args{host}    // $self->{host},
+      service => $args{service} // $self->{service} // DEFAULT_CQL_PORT,
+   )->and_then( sub {
       my $f = shift;
       return $f unless defined $keyspace;
 

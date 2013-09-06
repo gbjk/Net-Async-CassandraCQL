@@ -22,8 +22,6 @@ use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ColumnMeta;
 use Protocol::CassandraCQL::Result;
 
-use constant DEFAULT_CQL_PORT => 9042;
-
 =head1 NAME
 
 C<Net::Async::CassandraCQL::Connection> - connect to a single Cassandra database node
@@ -63,14 +61,6 @@ The following named parameters may be passed to C<new> or C<configure>:
 
 =over 8
 
-=item host => STRING
-
-The hostname of the Cassandra node to connect to
-
-=item service => STRING
-
-Optional. The service name or port number to connect to.
-
 =item username => STRING
 
 =item password => STRING
@@ -95,7 +85,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( host service username password
+   foreach (qw( username password
                 on_event on_topology_change on_status_change on_schema_change )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
@@ -146,19 +136,12 @@ Takes the following named arguments:
 
 =back
 
-A host name is required, either as a named argument or as a configured value
-on the object. If the service name is missing, the default CQL port will be
-used instead.
-
 =cut
 
 sub connect
 {
    my $self = shift;
    my %args = @_;
-
-   $args{host}    //= $self->{host}    or croak "Require 'host'";
-   $args{service} //= $self->{service} // DEFAULT_CQL_PORT;
 
    return ( $self->{connect_f} ||=
       $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } ) )

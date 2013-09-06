@@ -22,8 +22,6 @@ use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ColumnMeta;
 use Protocol::CassandraCQL::Result;
 
-use Net::Async::CassandraCQL::Query;
-
 use constant DEFAULT_CQL_PORT => 9042;
 
 use Net::Async::CassandraCQL;
@@ -485,9 +483,10 @@ sub query
 =head2 $f = $conn->prepare( $cql )
 
 Prepares a CQL query for later execution. On success, the returned Future
-yields an instance of a prepared query object (see below).
+yields the message frame of the result, after removing the C<RESULT_PREPARED>
+short.
 
- ( $query ) = $f->get
+ ( $frame ) = $f->get
 
 =cut
 
@@ -504,7 +503,7 @@ sub prepare
 
       $response->unpack_int == RESULT_PREPARED or return Future->new->fail( "Expected RESULT_PREPARED" );
 
-      return Future->new->done( Net::Async::CassandraCQL::Query->from_frame( $self, $response ) );
+      return Future->new->done( $response );
    });
 }
 

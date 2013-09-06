@@ -15,6 +15,8 @@ use base qw( IO::Async::Notifier );
 
 use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
 
+use Net::Async::CassandraCQL::Query;
+
 =head1 NAME
 
 C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQL
@@ -261,7 +263,31 @@ yields an instance of a prepared query object (see below).
 sub prepare
 {
    my $self = shift;
-   $self->{conn}->prepare( @_ );
+   my ( $cql ) = @_;
+
+   $self->{conn}->prepare( $cql )->then( sub {
+      my ( $frame ) = @_;
+
+      return Future->new->done( Net::Async::CassandraCQL::Query->from_frame( $self, $frame ) );
+   } );
+}
+
+=head2 $f = $cass->execute( $id, $data, $consistency )
+
+Executes a previously-prepared statement, given its ID and the binding data.
+On success, the returned Future will yield results of the same form as the
+C<query> method. C<$data> should contain a list of encoded byte-string values.
+
+Normally this method is not directly required - instead, use the C<execute>
+method on the query object itself, as this will encode the parameters
+correctly.
+
+=cut
+
+sub execute
+{
+   my $self = shift;
+   $self->{conn}->execute( @_ );
 }
 
 =head1 CONVENIENT WRAPPERS

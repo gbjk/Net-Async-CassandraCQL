@@ -236,11 +236,8 @@ $loop->add( $conn );
 
    wait_for { $f->is_ready };
 
-   my $query = $f->get;
-   is( $query->id, "0123456789ABCDEF", '$query->id after ->prepare->get' );
-   is( $query->columns, 1, '$query->columns' );
-   is( scalar $query->column_name(0), "test.t.f", '$query->column_name(0)' );
-   is( $query->column_type(0)->name, "VARCHAR", '$query->column_type(0)->name' );
+   my $frame = $f->get;
+   is( $frame->unpack_short_bytes, "0123456789ABCDEF", '$frame->unpack_short_bytes after ->prepare->get' );
 
    # ->execute directly
    $f = $conn->execute( "0123456789ABCDEF", [ "more-data" ], CONSISTENCY_ANY );
@@ -255,50 +252,6 @@ $loop->add( $conn );
                  "\x00\x01" . "\0\0\0\x09more-data" .
                  "\x00\x00",
               'stream after ->execute' );
-
-   # OPCODE_RESULT
-   $S2->syswrite( "\x81\x00\x01\x08\0\0\0\4\0\0\0\1" );
-
-   wait_for { $f->is_ready };
-
-   is_deeply( [ $f->get ], [],
-              '->execute returns nothing' );
-
-   # ->execute via $query from ARRAY
-   $f = $query->execute( [ "data-array" ], CONSISTENCY_ANY );
-
-   $stream = "";
-   wait_for_stream { length $stream >= 8 + 36 } $S2 => $stream;
-
-   # OPCODE_EXECUTE
-   is_hexstr( $stream,
-              "\x01\x00\x01\x0A\0\0\0\x24" .
-                 "\x00\x100123456789ABCDEF" .
-                 "\x00\x01" . "\0\0\0\x0adata-array" .
-                 "\x00\x00",
-              'stream after $query->execute(ARRAY)' );
-
-   # OPCODE_RESULT
-   $S2->syswrite( "\x81\x00\x01\x08\0\0\0\4\0\0\0\1" );
-
-   wait_for { $f->is_ready };
-
-   is_deeply( [ $f->get ], [],
-              '->execute returns nothing' );
-
-   # ->execute via $query from HASH
-   $f = $query->execute( { f => "data-hash" }, CONSISTENCY_ANY );
-
-   $stream = "";
-   wait_for_stream { length $stream >= 8 + 35 } $S2 => $stream;
-
-   # OPCODE_EXECUTE
-   is_hexstr( $stream,
-              "\x01\x00\x01\x0A\0\0\0\x23" .
-                 "\x00\x100123456789ABCDEF" .
-                 "\x00\x01" . "\0\0\0\x09data-hash" .
-                 "\x00\x00",
-              'stream after $query->execute(HASH)' );
 
    # OPCODE_RESULT
    $S2->syswrite( "\x81\x00\x01\x08\0\0\0\4\0\0\0\1" );

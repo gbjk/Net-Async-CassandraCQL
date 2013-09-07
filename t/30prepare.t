@@ -23,9 +23,13 @@ my ( $S1, $S2 ) = IO::Async::OS->socketpair() or die "Cannot create socket pair 
 my $cass = Net::Async::CassandraCQL->new;
 
 # CHEATING
-$cass->add_child( $cass->{conn} = Net::Async::CassandraCQL::Connection->new(
+$cass->add_child( my $conn = Net::Async::CassandraCQL::Connection->new(
    transport => IO::Async::Stream->new( handle => $S1 )
 ) );
+no warnings 'redefine';
+local *Net::Async::CassandraCQL::_get_a_node = sub {
+   return Future->new->done( $conn );
+};
 # END CHEATING
 
 $loop->add( $cass );

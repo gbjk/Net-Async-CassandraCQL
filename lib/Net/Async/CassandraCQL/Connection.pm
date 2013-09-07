@@ -22,6 +22,10 @@ use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ColumnMeta;
 use Protocol::CassandraCQL::Result;
 
+# Ensure that IO::Async definitely uses this for Iv6 connections as we need
+# the ->peerhost method
+require IO::Socket::IP;
+
 =head1 NAME
 
 C<Net::Async::CassandraCQL::Connection> - connect to a single Cassandra database node
@@ -97,6 +101,19 @@ sub configure
 
 =cut
 
+=head2 $id = $conn->nodeid
+
+Returns the connection's node ID (the string form of its IP address), which is
+used as its ID in the C<system.peers> table.
+
+=cut
+
+sub nodeid
+{
+   my $self = shift;
+   $self->{nodeid};
+}
+
 # function
 sub _decode_result
 {
@@ -148,6 +165,7 @@ sub connect
    return ( $self->{connect_f} ||=
       $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } ) )
       ->and_then( sub {
+         $self->{nodeid} = $self->transport->read_handle->peerhost;
          $self->startup
       })->then( sub { Future->new->done( $self ) });
 }

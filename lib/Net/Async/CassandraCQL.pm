@@ -241,10 +241,7 @@ sub _get_a_node
 {
    my $self = shift;
 
-   # Future 0.16 doesn't support immediate->followed_by( subclass ) correctly
-   # return Future->new->done( $self->{conn} );
-
-   return $self->loop->new_future->done( $self->{conn} );
+   return Future->new->done( $self->{conn} );
 }
 
 =head2 $f = $cass->query( $cql, $consistency )

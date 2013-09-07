@@ -6,7 +6,7 @@ use Module::Build;
 my $build = Module::Build->new(
    module_name => 'Net::Async::CassandraCQL',
    requires => {
-      'Future' => '0.13',
+      'Future' => '0.17', # immediate bugfixes
       'IO::Async::Loop' => '0.54', # ->connect returns Future
       'IO::Async::Protocol::Stream' => 0,
       'Protocol::CassandraCQL' => '0.05', # ->unpack_inet

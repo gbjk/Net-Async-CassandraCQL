@@ -6,8 +6,6 @@ use warnings;
 use Test::More;
 use Test::Identity;
 
-use IO::Async::Loop;
-
 use Net::Async::CassandraCQL;
 
 # Mock the ->_connect_node method
@@ -21,13 +19,9 @@ local *Net::Async::CassandraCQL::_connect_node = sub {
    return shift @connect_futures;
 };
 
-# We -have- a loop but we'll only use it for ->new_future
-my $loop = IO::Async::Loop->new();
-
 my $cass = Net::Async::CassandraCQL->new(
    host => "my-seed",
 );
-$loop->add( $cass );
 
 push @connect_futures, my $conn_f = Future->new;
 

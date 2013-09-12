@@ -580,10 +580,6 @@ sub _list_nodes
 
 =item *
 
-Support frame compression
-
-=item *
-
 Allow storing multiple Cassandra seed node hostnames for startup.
 
 =item *

@@ -17,8 +17,10 @@ use Carp;
 
 use Future 0.13;
 
+use Compress::Snappy qw( compress decompress );
+
 use Protocol::CassandraCQL qw(
-   :opcodes :results :consistencies
+   :opcodes :results :consistencies FLAG_COMPRESS
    build_frame parse_frame
 );
 use Protocol::CassandraCQL::Frame;
@@ -184,7 +186,13 @@ sub on_read
    $version == 0x81 or
       $self->fail_all_and_close( sprintf "Unexpected message version %#02x\n", $version ), return;
 
-   # TODO: flags
+   if( $flags & FLAG_COMPRESS ) {
+      $flags &= ~FLAG_COMPRESS;
+      $body = decompress( $body );
+   }
+
+   $flags == 0 or
+      $self->fail_all_and_close( sprintf "Unexpected message flags %#02x\n", $flags ), return;
 
    my $frame = Protocol::CassandraCQL::Frame->new( $body );
 
@@ -326,7 +334,16 @@ sub _send
    my $self = shift;
    my ( $opcode, $id, $frame, $f ) = @_;
 
-   $self->write( build_frame( 0x01, 0, $id, $opcode, $frame->bytes ) );
+   my $flags = 0;
+   my $body = $frame->bytes;
+
+   my $body_compressed = compress( $body );
+   if( length $body_compressed < length $body ) {
+      $flags |= FLAG_COMPRESS;
+      $body = $body_compressed;
+   }
+
+   $self->write( build_frame( 0x01, $flags, $id, $opcode, $body ) );
 
    $self->{streams}[$id] = $f;
 }
@@ -347,6 +364,7 @@ sub startup
    $self->send_message( OPCODE_STARTUP,
       Protocol::CassandraCQL::Frame->new->pack_string_map( {
             CQL_VERSION => "3.0.5",
+            COMPRESSION => "Snappy",
       } )
    )->then( sub {
       my ( $op, $response ) = @_;

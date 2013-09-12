@@ -33,9 +33,13 @@ $loop->add( $conn );
    wait_for_stream { length $stream >= 8 + 22 } $S2 => $stream;
 
    # OPCODE_STARTUP
+   # Since this map will contain 2 elements, we'll have to detect the order
+   # and supply the appropriate bytestring
    is_hexstr( $stream,
-              "\x01\x00\x01\x01\0\0\0\x16" .
-                 "\x00\x01" . "\x00\x0bCQL_VERSION\x00\x053.0.5",
+              "\x01\x00\x01\x01\0\0\0\x2b" .
+                 "\x00\x02" . ( $stream =~ m/CQL_VERSION.*COMPRESSION/
+                    ? "\x00\x0bCQL_VERSION\x00\x053.0.5\x00\x0bCOMPRESSION\x00\x06Snappy"
+                    : "\x00\x0bCOMPRESSION\x00\x06Snappy\x00\x0bCQL_VERSION\x00\x053.0.5" ),
               'stream after ->startup' );
 
    # OPCODE_READY

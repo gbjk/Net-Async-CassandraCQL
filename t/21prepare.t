@@ -56,6 +56,7 @@ $loop->add( $cass );
 
    my $query = $f->get;
    is( $query->id, "0123456789ABCDEF", '$query->id after ->prepare->get' );
+   is( $query->cql, "INSERT INTO t (f) = (?)", '$query->cql after ->prepare->get' );
    is( $query->columns, 1, '$query->columns' );
    is( scalar $query->column_name(0), "test.t.f", '$query->column_name(0)' );
    is( $query->column_type(0)->name, "VARCHAR", '$query->column_type(0)->name' );

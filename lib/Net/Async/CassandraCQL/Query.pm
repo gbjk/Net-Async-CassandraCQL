@@ -31,14 +31,15 @@ This is a subclass of L<Protocol::CassandraCQL::ColumnMeta>.
 sub from_frame
 {
    my $class = shift;
-   my ( $cassandra, $response ) = @_;
+   my ( $cassandra, $cql, $response ) = @_;
 
    my $id = $response->unpack_short_bytes;
 
    my $self = $class->SUPER::from_frame( $response );
 
    $self->{cassandra} = $cassandra;
-   $self->{id} = $id;
+   $self->{cql}       = $cql;
+   $self->{id}        = $id;
 
    return $self;
 }
@@ -57,6 +58,18 @@ sub id
 {
    my $self = shift;
    return $self->{id};
+}
+
+=head2 $cql = $query->cql
+
+Returns the original query string used to prepare the query.
+
+=cut
+
+sub cql
+{
+   my $self = shift;
+   return $self->{cql};
 }
 
 =head2 $f = $query->execute( $data, $consistency )

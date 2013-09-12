@@ -477,7 +477,7 @@ sub prepare
 
       $response->unpack_int == RESULT_PREPARED or return Future->new->fail( "Expected RESULT_PREPARED" );
 
-      my $query = Net::Async::CassandraCQL::Query->from_frame( $cassandra, $response );
+      my $query = Net::Async::CassandraCQL::Query->from_frame( $cassandra, $cql, $response );
       return Future->new->done( $query );
    });
 }

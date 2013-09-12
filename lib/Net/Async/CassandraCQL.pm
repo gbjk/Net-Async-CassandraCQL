@@ -215,7 +215,8 @@ sub _connect_node
       host    => $host,
       service => $service,
    )->on_fail( sub {
-      $self->remove_child( $conn )
+      # Some kinds of failure have already removed it
+      $self->remove_child( $conn ) if $conn->parent;
    });
 }
 

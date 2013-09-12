@@ -58,7 +58,6 @@ while( @pending_queries ) {
             ],
             rows => [
                [ "\x0a\0\0\2", "DC1", "rack1" ],
-               [ "\x0a\0\0\3", "DC1", "rack1" ],
             ],
          ),
       );
@@ -72,8 +71,7 @@ while( @pending_queries ) {
 undef $conns{"10.0.0.1"};
 $cass->_closed_node( "10.0.0.1" );
 
-ok( defined $conns{"10.0.0.2"} || defined $conns{"10.0.0.3"},
-    'new primary node picked' );
+ok( defined $conns{"10.0.0.2"}, 'new primary node picked' );
 
 # ->query after reconnect
 {

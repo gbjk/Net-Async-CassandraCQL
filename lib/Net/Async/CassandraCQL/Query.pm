@@ -44,6 +44,20 @@ sub from_frame
    return $self;
 }
 
+sub new
+{
+   my $class = shift;
+   my %args = @_;
+
+   my $self = $class->SUPER::new( %args );
+
+   $self->{cassandra} = $args{cassandra};
+   $self->{cql}       = $args{cql};
+   $self->{id}        = $args{id};
+
+   return $self;
+}
+
 =head1 METHODS
 
 =cut

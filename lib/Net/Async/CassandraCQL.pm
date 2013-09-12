@@ -15,7 +15,9 @@ use base qw( IO::Async::Notifier );
 
 use Carp;
 
+use Future::Utils qw( fmap_void );
 use List::Util qw( shuffle );
+use Scalar::Util qw( weaken );
 use Socket qw( inet_ntop AF_INET AF_INET6 );
 
 use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
@@ -322,9 +324,23 @@ sub _ready_node
 
    my $keyspace = $self->{keyspace};
 
-   return Future->new->done( $conn ) if !$keyspace;
-   return $conn->query( "USE " . $self->quote_identifier( $keyspace ), CONSISTENCY_ONE )->then( sub {
-      return Future->new->done( $conn );
+   my $keyspace_f =
+      $keyspace ? $conn->query( "USE " . $self->quote_identifier( $keyspace ), CONSISTENCY_ONE )
+                : Future->new->done;
+
+   $keyspace_f->then( sub {
+      my $conn_f = Future->new->done( $conn );
+      return $conn_f unless my $queries = $self->{queries};
+
+      # Expire old ones
+      defined $queries->{$_} or delete $queries->{$_} for keys %$queries;
+      return $conn_f unless keys %$queries;
+
+      ( fmap_void {
+         my $query = shift;
+         $conn->prepare( $query->cql, $self );
+      } foreach => [ values %$queries ] )
+         ->then( sub { $conn_f } );
    });
 }
 
@@ -414,8 +430,16 @@ sub prepare
    my $self = shift;
    my ( $cql ) = @_;
 
+   my $queries = $self->{queries} ||= {};
+
    $self->_get_a_node->then( sub {
       shift->prepare( $cql, $self )
+   })->on_done( sub {
+      my ( $query ) = @_;
+
+      # Expire old ones
+      defined $queries->{$_} or delete $queries->{$_} for keys %$queries;
+      weaken( $queries->{$query->id} = $query );
    });
 }
 

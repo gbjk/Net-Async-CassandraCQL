@@ -5,6 +5,7 @@ use warnings;
 
 use Test::More;
 use Test::Identity;
+use Test::Refcount;
 
 use Net::Async::CassandraCQL;
 use Protocol::CassandraCQL::Result 0.06;
@@ -29,6 +30,7 @@ my $f = $cass->connect;
 ok( defined $conns{"10.0.0.1"}, 'have a connection to 10.0.0.1' );
 
 my @pending_queries;
+my @pending_prepares;
 
 # Initial nodelist query
 while( @pending_queries ) {
@@ -67,11 +69,52 @@ while( @pending_queries ) {
    }
 }
 
+my $query;
+{
+   my $f = $cass->prepare( "INSERT INTO t (f) = (?)" );
+
+   ok( scalar @pending_prepares, '->prepare pending' );
+   my $p = shift @pending_prepares;
+
+   is( $p->[0], "10.0.0.1", 'nodeid of pending prepare' );
+   is( $p->[1], "INSERT INTO t (f) = (?)", 'cql of pending prepare' );
+
+   $p->[2]->done(
+      Net::Async::CassandraCQL::Query->new(
+         cassandra => $cass,
+         cql       => $p->[1],
+         id        => "0123456789ABCDEF",
+         columns   => [
+            [ test => t => f => "VARINT" ],
+         ],
+      )
+   );
+
+   $query = $f->get;
+
+   ok( defined $query, '$query defined after ->prepare->get' );
+
+   undef $f;
+   undef $p;
+   is_oneref( $query, '$query has refcount 1 initially' );
+}
+
 # Fake closure
 undef $conns{"10.0.0.1"};
 $cass->_closed_node( "10.0.0.1" );
 
 ok( defined $conns{"10.0.0.2"}, 'new primary node picked' );
+
+# Prepared statements
+{
+   ok( scalar @pending_prepares, 'prepare pending after reconnect' );
+   my $p = shift @pending_prepares;
+
+   is( $p->[0], "10.0.0.2", 'nodeid of pending prepare after reconnect' );
+   is( $p->[1], "INSERT INTO t (f) = (?)", 'cql of pending prepare after reconnect' );
+
+   $p->[2]->done;
+}
 
 # ->query after reconnect
 {
@@ -98,5 +141,13 @@ sub query
    my $self = shift;
    my ( $cql ) = @_;
    push @pending_queries, [ $self->nodeid, $cql, my $f = Future->new ];
+   return $f;
+}
+
+sub prepare
+{
+   my $self = shift;
+   my ( $cql ) = @_;
+   push @pending_prepares, [ $self->nodeid, $cql, my $f = Future->new ];
    return $f;
 }

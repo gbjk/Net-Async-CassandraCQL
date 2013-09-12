@@ -10,7 +10,7 @@ my $build = Module::Build->new(
       'IO::Async::Loop' => '0.54', # ->connect returns Future
       'IO::Async::Protocol::Stream' => 0,
       'IO::Socket::IP' => 0,
-      'Protocol::CassandraCQL' => '0.06', # ->new mocking for Result
+      'Protocol::CassandraCQL' => '0.07', # parse_frame/build_frame functions
    },
    build_requires => {
       'IO::Async::Test' => 0,

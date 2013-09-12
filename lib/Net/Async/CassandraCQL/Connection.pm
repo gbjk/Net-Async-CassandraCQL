@@ -17,7 +17,10 @@ use Carp;
 
 use Future 0.13;
 
-use Protocol::CassandraCQL qw( :opcodes :results :consistencies );
+use Protocol::CassandraCQL qw(
+   :opcodes :results :consistencies
+   build_frame parse_frame
+);
 use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ColumnMeta;
 use Protocol::CassandraCQL::Result;
@@ -175,14 +178,16 @@ sub on_read
    my $self = shift;
    my ( $buffref, $eof ) = @_;
 
-   my ( $version, $flags, $streamid, $opcode, $frame ) =
-      Protocol::CassandraCQL::Frame->parse( $$buffref ) or return 0;
+   my ( $version, $flags, $streamid, $opcode, $body ) = parse_frame( $$buffref ) or return 0;
 
    # v1 response
    $version == 0x81 or
       $self->fail_all_and_close( sprintf "Unexpected message version %#02x\n", $version ), return;
 
    # TODO: flags
+
+   my $frame = Protocol::CassandraCQL::Frame->new( $body );
+
    if( my $f = $self->{streams}[$streamid] ) {
       undef $self->{streams}[$streamid];
 
@@ -321,7 +326,7 @@ sub _send
    my $self = shift;
    my ( $opcode, $id, $frame, $f ) = @_;
 
-   $self->write( $frame->build( 0x01, 0, $id, $opcode ) );
+   $self->write( build_frame( 0x01, 0, $id, $opcode, $frame->bytes ) );
 
    $self->{streams}[$id] = $f;
 }

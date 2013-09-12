@@ -15,12 +15,18 @@ use base qw( IO::Async::Notifier );
 
 use Carp;
 
+use List::Util qw( shuffle );
+use Socket qw( inet_ntop AF_INET AF_INET6 );
+
 use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
 
 use Net::Async::CassandraCQL::Connection;
 use Net::Async::CassandraCQL::Query;
 
 use constant DEFAULT_CQL_PORT => 9042;
+
+# Time after which down nodes will be retried
+use constant NODE_RETRY_TIME => 60;
 
 =head1 NAME
 
@@ -186,17 +192,19 @@ used instead.
 =cut
 
 # ->_connect_node( $host, $service ) ==> $conn
-# Its own method to allow mocking during unit testing
+# mocked during unit testing
 sub _connect_node
 {
    my $self = shift;
    my ( $host, $service ) = @_;
 
+   $service //= $self->{service} // DEFAULT_CQL_PORT;
+
    my $conn = Net::Async::CassandraCQL::Connection->new(
       on_closed => sub {
          my $node = shift;
          $self->remove_child( $node );
-         $self->_closed_node( $node );
+         $self->_closed_node( $node->nodeid );
       },
       map { $_ => $self->{$_} } qw( username password ),
    );
@@ -210,12 +218,26 @@ sub _connect_node
    });
 }
 
+# invoked during unit testing
 sub _closed_node
 {
    my $self = shift;
-   my ( $node ) = @_;
+   my ( $nodeid ) = @_;
 
-   delete $self->{conn};
+   my $now = time();
+
+   my $node = $self->{nodes}{$nodeid} or return;
+
+   undef $node->{conn};
+   undef $node->{ready_f};
+   $node->{down_time} = $now;
+
+   if( $nodeid eq $self->{primary} ) {
+      $self->debug_printf( "PRIMARY DOWN %s", $nodeid );
+      undef $self->{primary};
+
+      $self->_pick_new_primary( $now );
+   }
 }
 
 sub connect
@@ -223,17 +245,87 @@ sub connect
    my $self = shift;
    my %args = @_;
 
-   my $keyspace = $self->{keyspace};
+   my $conn;
 
    $self->_connect_node(
       $args{host}    // $self->{host},
-      $args{service} // $self->{service} // DEFAULT_CQL_PORT,
+      $args{service},
    )->then( sub {
-      my ( $conn ) = @_;
-      $self->{conn} = $conn;
+      ( $conn ) = @_;
+      $self->_list_nodes( $conn );
+   })->then( sub {
+      my @nodes = @_;
 
-      return Future->new->done unless defined $keyspace;
-      $conn->query( "USE " . $self->quote_identifier( $keyspace ), CONSISTENCY_ONE );
+      $self->{nodes} = \my %nodes;
+      foreach my $node ( @nodes ) {
+         my $n = $nodes{$node->{host}} = {
+            data_center => $node->{data_center},
+            rack        => $node->{rack},
+         };
+
+         $n->{conn} = $conn if $node->{host} eq $conn->nodeid;
+      }
+
+      # Initial primary on the seed
+      $self->{primary} = ( grep { $nodes{$_}{conn} } keys %nodes )[0];
+      my $node = $nodes{$self->{primary}};
+
+      $self->debug_printf( "PRIMARY PICKED %s", $self->{primary} );
+      $node->{ready_f} = $self->_ready_node( $self->{primary} );
+   });
+}
+
+sub _pick_new_primary
+{
+   my $self = shift;
+   my ( $now ) = @_;
+
+   my $nodes = $self->{nodes};
+
+   my $new_primary;
+
+   # Expire old down statuses and try to find a non-down node
+   foreach my $nodeid ( shuffle keys %$nodes ) {
+      my $node = $nodes->{$nodeid};
+
+      delete $node->{down_time} if defined $node->{down_time} and $now - $node->{down_time} > NODE_RETRY_TIME;
+      $new_primary ||= $nodeid if !$node->{down_time};
+   }
+
+   if( !defined $new_primary ) {
+      die "ARGH! TODO: can't find a new node to be primary\n";
+   }
+
+   $self->debug_printf( "PRIMARY PICKED %s", $new_primary );
+   $self->{primary} = $new_primary;
+
+   my $node = $nodes->{$new_primary};
+
+   my $f = $node->{ready_f} = $self->_connect_node( $new_primary )->then( sub {
+      my ( $conn ) = @_;
+      $node->{conn} = $conn;
+
+      $self->_ready_node( $new_primary )
+   })->on_fail( sub {
+      print STDERR "ARGH! NEW PRIMARY FAILED: @_\n";
+   })->on_done( sub {
+      $self->debug_printf( "PRIMARY UP %s", $new_primary );
+   });
+}
+
+sub _ready_node
+{
+   my $self = shift;
+   my ( $nodeid ) = @_;
+
+   my $node = $self->{nodes}{$nodeid} or die "Don't have a node id $nodeid";
+   my $conn = $node->{conn} or die "Expected node to have a {conn} but it doesn't";
+
+   my $keyspace = $self->{keyspace};
+
+   return Future->new->done( $conn ) if !$keyspace;
+   return $conn->query( "USE " . $self->quote_identifier( $keyspace ), CONSISTENCY_ONE )->then( sub {
+      return Future->new->done( $conn );
    });
 }
 
@@ -241,7 +333,15 @@ sub _get_a_node
 {
    my $self = shift;
 
-   return Future->new->done( $self->{conn} );
+   defined $self->{primary} or die "ARGH: $self -> _get_a_node called with no defined PRIMARY";
+
+   my $nodes = $self->{nodes};
+
+   if( my $node = $nodes->{$self->{primary}} ) {
+      return $node->{ready_f};
+   }
+
+   die "ARGH: don't have a primary node";
 }
 
 =head2 $f = $cass->query( $cql, $consistency )
@@ -432,48 +532,38 @@ sub schema_columns
    );
 }
 
-=head2 $f = $cass->local_info
-
-A shortcut to a C<SELECT> query on C<system.local> and returning the (only)
-row in the result as a HASH reference.
-
- ( $local ) = $f->get
-
-=cut
-
-sub local_info
+sub _list_nodes
 {
    my $self = shift;
+   my ( $conn ) = @_;
 
-   $self->query_rows(
-      "SELECT * FROM system.local",
-      CONSISTENCY_ONE,
-   )->then( sub {
-      my ( $result ) = @_;
-      return Future->new->done( $result->row_hash( 0 ) )
-   });
-}
-
-=head2 $f = $cass->peers_info
-
-A shortcut to a C<SELECT> query on C<system.peers> and returning the rows in
-the result as a rowmap keyed by <TODO>.
-
- $peermap = $f->get
-
-=cut
-
-sub peers_info
-{
-   my $self = shift;
-
-   $self->query_rows(
-      "SELECT * FROM system.peers",
-      CONSISTENCY_ONE,
-   )->then( sub {
-      my ( $result ) = @_;
-      return Future->new->done( [ $result->rows_hash ] )
-   });
+   # The system.peers table doesn't include the node we actually connect to.
+   # So we'll have to look up its own information from system.local and add
+   # the socket address manually.
+   Future->needs_all(
+      $conn->query( "SELECT data_center, rack FROM system.local", CONSISTENCY_ONE )
+         ->then( sub {
+            my ( $type, $result ) = @_;
+            $type eq "rows" or Future->new->fail( "Expected 'rows' result" );
+            my $local = $result->row_hash( 0 );
+            $local->{host} = $conn->nodeid;
+            Future->new->done( $local );
+         }),
+      $conn->query( "SELECT peer, data_center, rack FROM system.peers", CONSISTENCY_ONE )
+         ->then( sub {
+            my ( $type, $result ) = @_;
+            $type eq "rows" or Future->new->fail( "Expected 'rows' result" );
+            my @nodes = $result->rows_hash;
+            foreach my $node ( @nodes ) {
+               my $addrlen = length $node->{peer};
+               my $family = $addrlen ==  4 ? AF_INET :
+                            $addrlen == 16 ? AF_INET6 :
+                            die "Expected ADDRLEN 4 or 16";
+               $node->{host} = inet_ntop( $family, delete $node->{peer} );
+            }
+            Future->new->done( @nodes );
+         }),
+   )
 }
 
 =head1 TODO
@@ -486,8 +576,25 @@ Support frame compression
 
 =item *
 
-Allow storing multiple Cassandra node hostnames and perform some kind of
-balancing or failover of connections.
+Allow storing multiple Cassandra seed node hostnames for startup.
+
+=item *
+
+Allow more than one primary node - roundrobin, or other load balancing
+strategies.
+
+=item *
+
+Allow backup nodes, for faster connection failover.
+
+=item *
+
+Use C<TOPOLGY_CHANGE> and C<STATUS_CHANGE> events to keep the nodelist
+updated.
+
+=item *
+
+Node preference by C<data_center>.
 
 =back
 

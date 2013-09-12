@@ -11,41 +11,28 @@ use Protocol::CassandraCQL::Result 0.06;
 
 # Mock the ->_connect_node method
 no warnings 'redefine';
-my @connect_futures;
-my $connect_host;
+my %conns;
 local *Net::Async::CassandraCQL::_connect_node = sub {
-   shift;
-   die "No connect future pending" unless @connect_futures;
-   ( $connect_host ) = @_;
-   return shift @connect_futures;
+   my $self = shift;
+   my ( $connect_host, $connect_service ) = @_;
+   $conns{$connect_host} = my $conn = TestConnection->new;
+   $conn->{nodeid} = $connect_host;
+   return Future->new->done( $conn );
 };
 
 my $cass = Net::Async::CassandraCQL->new(
-   host => "my-seed",
+   host => "10.0.0.1",
 );
-
-push @connect_futures, my $conn_f = Future->new;
 
 my $f = $cass->connect;
 
-ok( defined $f, 'defined $f for ->connect' );
-is( $connect_host, "my-seed", '->connect host' );
-ok( !$f->is_ready, '$f not yet ready' );
+ok( defined $conns{"10.0.0.1"}, 'have a connection to 10.0.0.1' );
 
 my @pending_queries;
-my $conn = TestConnection->new;
-$cass->add_child( $conn );
-$conn_f->done( $conn );
 
 # Initial nodelist query
-
-ok( !$f->is_ready, '$f not yet ready before nodelist queries are done' );
-
-is( scalar @pending_queries, 2, '2 pending queries from connect' );
 while( @pending_queries ) {
    my $q = shift @pending_queries;
-   identical( $q->[0], $conn, 'connection on pending query' );
-
    if( $q->[1] eq "SELECT data_center, rack FROM system.local" ) {
       pass( "Query on system.local" );
       $q->[2]->done( rows =>
@@ -81,20 +68,26 @@ while( @pending_queries ) {
    }
 }
 
-ok( $f->is_ready, '$f is now ready' );
+# Fake closure
+undef $conns{"10.0.0.1"};
+$cass->_closed_node( "10.0.0.1" );
 
-# ->query on the primary
+ok( defined $conns{"10.0.0.2"} || defined $conns{"10.0.0.3"},
+    'new primary node picked' );
+
+# ->query after reconnect
 {
-   $f = $cass->query( "DO SOMETHING now", 0 );
+   my $f = $cass->query( "GET THING", 0 );
+   ok( defined $f, 'defined ->query after reconnect' );
 
-   ok( scalar @pending_queries, '@pending_queries after ->query' );
+   ok( scalar @pending_queries, '->query after reconnect creates query' );
+
    my $q = shift @pending_queries;
+   like( $q->[0], qr/^10\.0\.0\.[23]$/, '$q conn' );
+   is( $q->[1], "GET THING", '$q cql' );
+   $q->[2]->done( result => "here" );
 
-   identical( $q->[0], $conn, 'connection on pending query' );
-   is( $q->[1], "DO SOMETHING now", 'cql for pending query' );
-
-   $q->[2]->done;
-   ok( $f->is_ready, '$f is now ready' );
+   is_deeply( [ $f->get ], [ result => "here" ], '$q result' );
 }
 
 done_testing;
@@ -102,15 +95,10 @@ done_testing;
 package TestConnection;
 use base qw( Net::Async::CassandraCQL::Connection );
 
-sub nodeid
-{
-   return "10.0.0.1";
-}
-
 sub query
 {
    my $self = shift;
    my ( $cql ) = @_;
-   push @pending_queries, [ $self, $cql, my $f = Future->new ];
+   push @pending_queries, [ $self->nodeid, $cql, my $f = Future->new ];
    return $f;
 }

@@ -21,7 +21,6 @@ use Socket qw( inet_ntop AF_INET AF_INET6 );
 use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
 
 use Net::Async::CassandraCQL::Connection;
-use Net::Async::CassandraCQL::Query;
 
 use constant DEFAULT_CQL_PORT => 9042;
 
@@ -416,12 +415,8 @@ sub prepare
    my ( $cql ) = @_;
 
    $self->_get_a_node->then( sub {
-      shift->prepare( $cql )
-   })->then( sub {
-      my ( $frame ) = @_;
-
-      return Future->new->done( Net::Async::CassandraCQL::Query->from_frame( $self, $frame ) );
-   } );
+      shift->prepare( $cql, $self )
+   });
 }
 
 =head2 $f = $cass->execute( $id, $data, $consistency )

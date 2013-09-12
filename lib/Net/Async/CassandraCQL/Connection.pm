@@ -22,6 +22,8 @@ use Protocol::CassandraCQL::Frame;
 use Protocol::CassandraCQL::ColumnMeta;
 use Protocol::CassandraCQL::Result;
 
+use Net::Async::CassandraCQL::Query;
+
 # Ensure that IO::Async definitely uses this for Iv6 connections as we need
 # the ->peerhost method
 require IO::Socket::IP;
@@ -456,17 +458,16 @@ sub query
 =head2 $f = $conn->prepare( $cql )
 
 Prepares a CQL query for later execution. On success, the returned Future
-yields the message frame of the result, after removing the C<RESULT_PREPARED>
-short.
+yields an instance of L<Net::Async::CassandraCQL::Query>.
 
- ( $frame ) = $f->get
+ ( $query ) = $f->get
 
 =cut
 
 sub prepare
 {
    my $self = shift;
-   my ( $cql ) = @_;
+   my ( $cql, $cassandra ) = @_;
 
    $self->send_message( OPCODE_PREPARE,
       Protocol::CassandraCQL::Frame->new->pack_lstring( $cql )
@@ -476,7 +477,8 @@ sub prepare
 
       $response->unpack_int == RESULT_PREPARED or return Future->new->fail( "Expected RESULT_PREPARED" );
 
-      return Future->new->done( $response );
+      my $query = Net::Async::CassandraCQL::Query->from_frame( $cassandra, $response );
+      return Future->new->done( $query );
    });
 }
 

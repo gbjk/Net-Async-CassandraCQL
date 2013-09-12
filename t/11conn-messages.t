@@ -215,8 +215,8 @@ $loop->add( $conn );
 
    wait_for { $f->is_ready };
 
-   my $frame = $f->get;
-   is( $frame->unpack_short_bytes, "0123456789ABCDEF", '$frame->unpack_short_bytes after ->prepare->get' );
+   my $query = $f->get;
+   is( $query->id, "0123456789ABCDEF", '$query->id after ->prepare->get' );
 
    # ->execute directly
    $f = $conn->execute( "0123456789ABCDEF", [ "more-data" ], CONSISTENCY_ANY );

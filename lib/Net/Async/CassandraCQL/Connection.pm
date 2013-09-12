@@ -140,12 +140,10 @@ sub _decode_result
    }
 }
 
-=head2 $f = $conn->connect( %args )
+=head2 $conn->connect( %args ) ==> $conn
 
 Connects to the Cassandra node an send the C<OPCODE_STARTUP> message. The
 returned Future will yield the connection itself on success.
-
- ( $conn ) = $f->get
 
 Takes the following named arguments:
 
@@ -280,13 +278,11 @@ sub fail_all_and_close
    return Future->new->fail( $failure );
 }
 
-=head2 $f = $conn->send_message( $opcode, $frame )
+=head2 $conn->send_message( $opcode, $frame ) ==> ( $reply_opcode, $reply_frame )
 
 Sends a message with the given opcode and L<Protocol::CassandraCQL::Frame> for
 the message body. The returned Future will yield the response opcode and
 frame.
-
-  ( $reply_opcode, $reply_frame ) = $f->get
 
 This is a low-level method; applications should instead use one of the wrapper
 methods below.
@@ -330,7 +326,7 @@ sub _send
    $self->{streams}[$id] = $f;
 }
 
-=head2 $f = $conn->startup
+=head2 $conn->startup ==> ()
 
 Sends the initial connection setup message. On success, the returned Future
 yields nothing.
@@ -390,7 +386,7 @@ sub _authenticate
    }
 }
 
-=head2 $f = $conn->options
+=head2 $conn->options ==> $options
 
 Requests the list of supported options from the server node. On success, the
 returned Future yields a HASH reference mapping option names to ARRAY
@@ -418,12 +414,10 @@ sub options
    });
 }
 
-=head2 $f = $conn->query( $cql, $consistency )
+=head2 $conn->query( $cql, $consistency ) ==> ( $type, $result )
 
 Performs a CQL query. On success, the values returned from the Future will
 depend on the type of query.
-
- ( $type, $result ) = $f->get
 
 For C<USE> queries, the type is C<keyspace> and C<$result> is a string giving
 the name of the new keyspace.
@@ -455,12 +449,10 @@ sub query
    });
 }
 
-=head2 $f = $conn->prepare( $cql )
+=head2 $conn->prepare( $cql ) ==> $query
 
 Prepares a CQL query for later execution. On success, the returned Future
 yields an instance of L<Net::Async::CassandraCQL::Query>.
-
- ( $query ) = $f->get
 
 =cut
 
@@ -482,7 +474,7 @@ sub prepare
    });
 }
 
-=head2 $f = $conn->execute( $id, $data, $consistency )
+=head2 $conn->execute( $id, $data, $consistency ) ==> ( $type, $result )
 
 Executes a previously-prepared statement, given its ID and the binding data.
 On success, the returned Future will yield results of the same form as the
@@ -512,7 +504,7 @@ sub execute
    });
 }
 
-=head2 $f = $conn->register( $events )
+=head2 $conn->register( $events ) ==> ()
 
 Registers the connection's interest in receiving events of the types given in
 the ARRAY reference. Event names may be C<TOPOLOGY_CHANGE>, C<STATUS_CHANGE>

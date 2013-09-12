@@ -86,7 +86,7 @@ sub cql
    return $self->{cql};
 }
 
-=head2 $f = $query->execute( $data, $consistency )
+=head2 $query->execute( $data, $consistency ) ==> ( $type, $result )
 
 Executes the query on the Cassandra connection object that created it,
 returning a future yielding the result the same way as the C<query> or

@@ -171,7 +171,7 @@ sub quote_identifier
    return qq("$str");
 }
 
-=head2 $f = $cass->connect( %args )
+=head2 $cass->connect( %args ) ==> ()
 
 Connects to the Cassandra node and starts up the connection. The returned
 Future will yield nothing on success.
@@ -359,12 +359,10 @@ sub _get_a_node
    die "ARGH: don't have a primary node";
 }
 
-=head2 $f = $cass->query( $cql, $consistency )
+=head2 $cass->query( $cql, $consistency ) ==> ( $type, $result )
 
 Performs a CQL query. On success, the values returned from the Future will
 depend on the type of query.
-
- ( $type, $result ) = $f->get
 
 For C<USE> queries, the type is C<keyspace> and C<$result> is a string giving
 the name of the new keyspace.
@@ -394,13 +392,11 @@ sub query
    });
 }
 
-=head2 $f = $cass->query_rows( $cql, $consistency )
+=head2 $cass->query_rows( $cql, $consistency ) ==> $result
 
 A shortcut wrapper for C<query> which expects a C<rows> result and returns it
 directly. Any other result is treated as an error. The returned Future returns
 a C<Protocol::CassandraCQL::Result> directly
-
- $result = $f->get
 
 =cut
 
@@ -416,12 +412,10 @@ sub query_rows
    });
 }
 
-=head2 $f = $cass->prepare( $cql )
+=head2 $cass->prepare( $cql ) ==> $query
 
 Prepares a CQL query for later execution. On success, the returned Future
 yields an instance of a prepared query object (see below).
-
- ( $query ) = $f->get
 
 =cut
 
@@ -443,7 +437,7 @@ sub prepare
    });
 }
 
-=head2 $f = $cass->execute( $id, $data, $consistency )
+=head2 $cass->execute( $id, $data, $consistency ) ==> ( $type, $result )
 
 Executes a previously-prepared statement, given its ID and the binding data.
 On success, the returned Future will yield results of the same form as the
@@ -474,12 +468,10 @@ The following wrapper methods all wrap the basic C<query> operation.
 
 =cut
 
-=head2 $f = $cass->schema_keyspaces
+=head2 $cass->schema_keyspaces ==> $result
 
 A shortcut to a C<SELECT> query on C<system.schema_keyspaces>, which returns a
 result object listing all the keyspaces.
-
- ( $result ) = $f->get
 
 Exact details of the returned columns will depend on the Cassandra version,
 but the result should at least be keyed by the first column, called
@@ -499,12 +491,10 @@ sub schema_keyspaces
    );
 }
 
-=head2 $f = $cass->schema_columnfamilies( $keyspace )
+=head2 $cass->schema_columnfamilies( $keyspace ) ==> $result
 
 A shortcut to a C<SELECT> query on C<system.schema_columnfamilies>, which
 returns a result object listing all the columnfamilies of the given keyspace.
-
- ( $result ) = $f->get
 
 Exact details of the returned columns will depend on the Cassandra version,
 but the result should at least be keyed by the first column, called
@@ -525,12 +515,10 @@ sub schema_columnfamilies
    );
 }
 
-=head2 $f = $cass->schema_columns( $keyspace, $columnfamily )
+=head2 $cass->schema_columns( $keyspace, $columnfamily ) ==> $result
 
 A shortcut to a C<SELECT> query on C<system.schema_columns>, which returns a
 result object listing all the columns of the given columnfamily.
-
- ( $result ) = $f->get
 
 Exact details of the returned columns will depend on the Cassandra version,
 but the result should at least be keyed by the first column, called

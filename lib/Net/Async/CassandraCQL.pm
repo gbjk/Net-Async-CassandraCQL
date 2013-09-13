@@ -380,6 +380,32 @@ returns nothing.
 
 =cut
 
+sub _debug_wrap_result
+{
+   my ( $op, $self, $f ) = @_;
+
+   $f->on_ready( sub {
+      my $f = shift;
+      if( $f->failure ) {
+         $self->debug_printf( "$op => FAIL %s", scalar $f->failure );
+      }
+      elsif( my ( $type, $result ) = $f->get ) {
+         if( $type eq "rows" ) {
+            $result = sprintf "%d x %d columns", $result->rows, $result->columns;
+         }
+         elsif( $type eq "schema_change" ) {
+            $result = sprintf "%s %s", $result->[0], join ".", @{$result}[1..$#$result];
+         }
+         $self->debug_printf( "$op => %s %s", uc $type, $result );
+      }
+      else {
+         $self->debug_printf( "$op => VOID" );
+      }
+   }) if $IO::Async::Notifier::DEBUG;
+
+   return $f;
+}
+
 sub query
 {
    my $self = shift;
@@ -390,7 +416,7 @@ sub query
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'query' needs a consistency level";
 
-   $self->_get_a_node->then( sub {
+   _debug_wrap_result QUERY => $self, $self->_get_a_node->then( sub {
       shift->query( $cql, $consistency );
    });
 }
@@ -436,6 +462,8 @@ sub prepare
    })->on_done( sub {
       my ( $query ) = @_;
 
+      $self->debug_printf( "PREPARE => [%s]", unpack "H*", $query->id );
+
       # Expire old ones
       defined $queries->{$_} or delete $queries->{$_} for keys %$queries;
       weaken( $queries->{$query->id} = $query );
@@ -464,7 +492,7 @@ sub execute
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'execute' needs a consistency level";
 
-   $self->_get_a_node->then( sub {
+   _debug_wrap_result EXECUTE => $self, $self->_get_a_node->then( sub {
       shift->execute( $query->id, $data, $consistency );
    });
 }

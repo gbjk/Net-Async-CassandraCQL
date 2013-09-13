@@ -438,11 +438,11 @@ sub prepare
    });
 }
 
-=head2 $cass->execute( $id, $data, $consistency ) ==> ( $type, $result )
+=head2 $cass->execute( $query, $data, $consistency ) ==> ( $type, $result )
 
-Executes a previously-prepared statement, given its ID and the binding data.
-On success, the returned Future will yield results of the same form as the
-C<query> method. C<$data> should contain a list of encoded byte-string values.
+Executes a previously-prepared statement, given the binding data. On success,
+the returned Future will yield results of the same form as the C<query>
+method. C<$data> should contain a list of encoded byte-string values.
 
 Normally this method is not directly required - instead, use the C<execute>
 method on the query object itself, as this will encode the parameters
@@ -453,13 +453,13 @@ correctly.
 sub execute
 {
    my $self = shift;
-   my ( $id, $data, $consistency ) = @_;
+   my ( $query, $data, $consistency ) = @_;
 
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'execute' needs a consistency level";
 
    $self->_get_a_node->then( sub {
-      shift->execute( $id, $data, $consistency );
+      shift->execute( $query->id, $data, $consistency );
    });
 }
 

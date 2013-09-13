@@ -119,7 +119,7 @@ sub execute
 
    my @bytes = $self->encode_data( @data );
 
-   return $self->{cassandra}->execute( $self->id, \@bytes, $consistency );
+   return $self->{cassandra}->execute( $self, \@bytes, $consistency );
 }
 
 =head1 SPONSORS

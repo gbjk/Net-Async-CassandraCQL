@@ -385,6 +385,8 @@ sub query
    my $self = shift;
    my ( $cql, $consistency ) = @_;
 
+   $self->debug_printf( "QUERY %s", $cql );
+
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'query' needs a consistency level";
 
@@ -425,6 +427,8 @@ sub prepare
    my $self = shift;
    my ( $cql ) = @_;
 
+   $self->debug_printf( "PREPARE %s", $cql );
+
    my $queries = $self->{queries} ||= {};
 
    $self->_get_a_node->then( sub {
@@ -454,6 +458,8 @@ sub execute
 {
    my $self = shift;
    my ( $query, $data, $consistency ) = @_;
+
+   $self->debug_printf( "EXECUTE %s [%s]", $query->cql, unpack "H*", $query->id );
 
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'execute' needs a consistency level";

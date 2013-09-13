@@ -24,7 +24,7 @@ my $cass = Net::Async::CassandraCQL->new;
 
 # CHEATING
 $cass->add_child( my $conn = Net::Async::CassandraCQL::Connection->new(
-   transport => IO::Async::Stream->new( handle => $S1 )
+   handle => $S1,
 ) );
 no warnings 'redefine';
 local *Net::Async::CassandraCQL::_get_a_node = sub {

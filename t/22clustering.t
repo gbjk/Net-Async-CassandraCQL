@@ -69,6 +69,9 @@ while( @pending_queries ) {
    }
 }
 
+ok( $f->is_ready, '->connect now done after initial queries' );
+$f->get;
+
 my $query;
 {
    my $f = $cass->prepare( "INSERT INTO t (f) = (?)" );

@@ -327,11 +327,15 @@ sub _pick_new_primary
 
    my $new_primary;
 
-   # Expire old down statuses and try to find a non-down node
+   # Expire old down statuses and try to find a non-down node that is not yet
+   # primary
    foreach my $nodeid ( shuffle keys %$nodes ) {
       my $node = $nodes->{$nodeid};
 
       delete $node->{down_time} if defined $node->{down_time} and $now - $node->{down_time} > NODE_RETRY_TIME;
+
+      next if $self->{primary_ids}{$nodeid};
+
       $new_primary ||= $nodeid if !$node->{down_time};
    }
 

@@ -111,9 +111,24 @@ connect method.
 Optional. Default consistency level to use if none is provided to C<query> or
 C<execute>.
 
+=item primaries => INT
+
+Optional. The number of primary node connections to maintain. Defaults to 1 if
+not specified.
+
 =back
 
 =cut
+
+sub _init
+{
+   my $self = shift;
+   my ( $params ) = @_;
+
+   $params->{primaries} //= 1;
+
+   $self->SUPER::_init( $params );
+}
 
 sub configure
 {
@@ -122,6 +137,12 @@ sub configure
 
    foreach (qw( host service username password keyspace default_consistency )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
+   }
+
+   if( exists $params{primaries} ) {
+      $self->{primaries} = delete $params{primaries};
+
+      # TODO: connect more / drain old ones
    }
 
    $self->SUPER::configure( %params );
@@ -234,9 +255,9 @@ sub _closed_node
    undef $node->{ready_f};
    $node->{down_time} = $now;
 
-   if( $nodeid eq $self->{primary} ) {
+   if( exists $self->{primary_ids}{$nodeid} ) {
       $self->debug_printf( "PRIMARY DOWN %s", $nodeid );
-      undef $self->{primary};
+      delete $self->{primary_ids}{$nodeid};
 
       $self->_pick_new_primary( $now );
    }
@@ -259,21 +280,41 @@ sub connect
       my @nodes = @_;
 
       $self->{nodes} = \my %nodes;
+      my @other_nodeids; # nodeids apart from $conn
       foreach my $node ( @nodes ) {
          my $n = $nodes{$node->{host}} = {
             data_center => $node->{data_center},
             rack        => $node->{rack},
          };
 
-         $n->{conn} = $conn if $node->{host} eq $conn->nodeid;
+         if( $node->{host} eq $conn->nodeid ) {
+            $n->{conn} = $conn;
+         }
+         else {
+            push @other_nodeids, $node->{host};
+         }
       }
 
       # Initial primary on the seed
-      $self->{primary} = ( grep { $nodes{$_}{conn} } keys %nodes )[0];
-      my $node = $nodes{$self->{primary}};
+      $self->{primary_ids} = {
+         $conn->nodeid => 1,
+      };
+      my $primary0 = $nodes{$conn->nodeid};
+      my $have_primaries = 1;
 
-      $self->debug_printf( "PRIMARY PICKED %s", $self->{primary} );
-      $node->{ready_f} = $self->_ready_node( $self->{primary} );
+      my @conn_f;
+
+      $self->debug_printf( "PRIMARY PICKED %s", $conn->nodeid );
+      push @conn_f, $primary0->{ready_f} = $self->_ready_node( $conn->nodeid );
+
+      while( @other_nodeids and $have_primaries < $self->{primaries} ) {
+         my ( $primary ) = splice @other_nodeids, rand @other_nodeids, 1, ();
+         push @conn_f, $self->_connect_new_primary( $primary );
+         $have_primaries++;
+      }
+
+      return $conn_f[0] if @conn_f == 1;
+      return Future->needs_all( @conn_f );
    });
 }
 
@@ -298,10 +339,18 @@ sub _pick_new_primary
       die "ARGH! TODO: can't find a new node to be primary\n";
    }
 
-   $self->debug_printf( "PRIMARY PICKED %s", $new_primary );
-   $self->{primary} = $new_primary;
+   $self->_connect_new_primary( $new_primary );
+}
 
-   my $node = $nodes->{$new_primary};
+sub _connect_new_primary
+{
+   my $self = shift;
+   my ( $new_primary ) = @_;
+
+   $self->debug_printf( "PRIMARY PICKED %s", $new_primary );
+   $self->{primary_ids}{$new_primary} = 1;
+
+   my $node = $self->{nodes}{$new_primary};
 
    my $f = $node->{ready_f} = $self->_connect_node( $new_primary )->then( sub {
       my ( $conn ) = @_;
@@ -349,11 +398,13 @@ sub _get_a_node
 {
    my $self = shift;
 
-   defined $self->{primary} or die "ARGH: $self -> _get_a_node called with no defined PRIMARY";
+   my @primaries = keys %{ $self->{primary_ids} } or die "ARGH: $self -> _get_a_node called with no defined primaries";
+
+   ( $self->{next_primary} += 1 ) %= @primaries;
 
    my $nodes = $self->{nodes};
 
-   if( my $node = $nodes->{$self->{primary}} ) {
+   if( my $node = $nodes->{ $primaries[$self->{next_primary}] } ) {
       return $node->{ready_f};
    }
 
@@ -457,16 +508,22 @@ sub prepare
 
    my $queries = $self->{queries} ||= {};
 
-   $self->_get_a_node->then( sub {
-      shift->prepare( $cql, $self )
-   })->on_done( sub {
+   my @prepare_f = map {
+      my $node = $self->{nodes}{$_}{conn};
+      $node->prepare( $cql, $self )
+   } keys %{ $self->{primary_ids} };
+
+   Future->needs_all( @prepare_f )->then( sub {
       my ( $query ) = @_;
+      # Ignore the other objects; they'll all have the same ID anyway
 
       $self->debug_printf( "PREPARE => [%s]", unpack "H*", $query->id );
 
       # Expire old ones
       defined $queries->{$_} or delete $queries->{$_} for keys %$queries;
       weaken( $queries->{$query->id} = $query );
+
+      Future->new->done( $query );
    });
 }
 
@@ -618,8 +675,12 @@ Allow storing multiple Cassandra seed node hostnames for startup.
 
 =item *
 
-Allow more than one primary node - roundrobin, or other load balancing
-strategies.
+Allow other load-balancing strategies than roundrobin. Prefer load-balancing
+to nodes that are already ready.
+
+=item *
+
+Adjust connected primary nodes when changing C<primaries> parameter.
 
 =item *
 

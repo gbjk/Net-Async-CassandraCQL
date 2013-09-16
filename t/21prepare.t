@@ -26,10 +26,11 @@ my $cass = Net::Async::CassandraCQL->new;
 $cass->add_child( my $conn = Net::Async::CassandraCQL::Connection->new(
    handle => $S1,
 ) );
-no warnings 'redefine';
-local *Net::Async::CassandraCQL::_get_a_node = sub {
-   return Future->new->done( $conn );
-};
+$cass->{nodes} = { NODEID => {
+      conn    => $conn,
+      ready_f => Future->new->done( $conn ),
+} };
+$cass->{primary_ids} = { NODEID => 1 };
 # END CHEATING
 
 $loop->add( $cass );

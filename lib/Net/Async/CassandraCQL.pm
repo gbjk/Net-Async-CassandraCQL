@@ -462,13 +462,13 @@ sub query
    my $self = shift;
    my ( $cql, $consistency ) = @_;
 
-   $self->debug_printf( "QUERY %s", $cql );
-
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'query' needs a consistency level";
 
    _debug_wrap_result QUERY => $self, $self->_get_a_node->then( sub {
-      shift->query( $cql, $consistency );
+      my $node = shift;
+      $self->debug_printf( "QUERY on {%s}: %s", $node->nodeid, $cql );
+      $node->query( $cql, $consistency );
    });
 }
 
@@ -544,13 +544,13 @@ sub execute
    my $self = shift;
    my ( $query, $data, $consistency ) = @_;
 
-   $self->debug_printf( "EXECUTE %s [%s]", $query->cql, unpack "H*", $query->id );
-
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'execute' needs a consistency level";
 
    _debug_wrap_result EXECUTE => $self, $self->_get_a_node->then( sub {
-      shift->execute( $query->id, $data, $consistency );
+      my $node = shift;
+      $self->debug_printf( "EXECUTE on {%s}: %s [%s]", $node->nodeid, $query->cql, unpack "H*", $query->id );
+      $node->execute( $query->id, $data, $consistency );
    });
 }
 

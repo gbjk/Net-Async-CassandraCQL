@@ -484,13 +484,30 @@ sub _get_a_node
 {
    my $self = shift;
 
-   my @primaries = keys %{ $self->{primary_ids} } or die "ARGH: $self -> _get_a_node called with no defined primaries";
-
-   ( $self->{next_primary} += 1 ) %= @primaries;
-
    my $nodes = $self->{nodes};
 
-   if( my $node = $nodes->{ $primaries[$self->{next_primary}] } ) {
+   # TODO: Other sorting strategies;
+   #   e.g. fewest outstanding queries, least accumulated time recently
+   my @nodeids;
+   {
+      my $next = $self->{next_primary} // 0;
+      @nodeids = keys %{ $self->{primary_ids} } or die "ARGH: $self -> _get_a_node called with no defined primaries";
+
+      # Rotate to the next in sequence
+      @nodeids = ( @nodeids[$next..$#nodeids], @nodeids[0..$next-1] );
+      ( $next += 1 ) %= @nodeids;
+
+      my $next_ready = $next;
+      # Skip non-ready ones
+      while( not $nodes->{$nodeids[0]}->{ready_f}->is_ready ) {
+         push @nodeids, shift @nodeids;
+         ( $next_ready += 1 ) %= @nodeids;
+         last if $next_ready == $next; # none were ready - just use the next
+      }
+      $self->{next_primary} = $next_ready;
+   }
+
+   if( my $node = $nodes->{ $nodeids[0] } ) {
       return $node->{ready_f};
    }
 
@@ -757,8 +774,7 @@ Allow storing multiple Cassandra seed node hostnames for startup.
 
 =item *
 
-Allow other load-balancing strategies than roundrobin. Prefer load-balancing
-to nodes that are already ready.
+Allow other load-balancing strategies than roundrobin.
 
 =item *
 

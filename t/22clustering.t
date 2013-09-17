@@ -154,3 +154,8 @@ sub prepare
    push @pending_prepares, [ $self->nodeid, $cql, my $f = Future->new ];
    return $f;
 }
+
+sub register
+{
+   return Future->new->done;
+}

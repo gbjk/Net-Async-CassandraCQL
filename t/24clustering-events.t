@@ -7,29 +7,31 @@ use Test::More;
 use Test::Identity;
 use Test::Refcount;
 
+use Socket qw( pack_sockaddr_in inet_aton );
+
 use Net::Async::CassandraCQL;
 use Protocol::CassandraCQL::Result 0.06;
 
 # Mock the ->_connect_node method
 no warnings 'redefine';
 my %conns;
+my %conn_is_registered;
 local *Net::Async::CassandraCQL::_connect_node = sub {
    my $self = shift;
    my ( $connect_host, $connect_service ) = @_;
    $conns{$connect_host} = my $conn = TestConnection->new;
+   delete $conn_is_registered{$connect_host};
    $conn->{nodeid} = $connect_host;
    return Future->new->done( $conn );
 };
 
 my $cass = Net::Async::CassandraCQL->new(
    host => "10.0.0.1",
-   primaries => 3,
 );
 
 my $f = $cass->connect;
 
 my @pending_queries;
-my @pending_prepares;
 
 # Initial nodelist query
 while( @pending_queries ) {
@@ -59,7 +61,6 @@ while( @pending_queries ) {
             ],
             rows => [
                [ "\x0a\0\0\2", "DC1", "rack1" ],
-               [ "\x0a\0\0\3", "DC1", "rack1" ],
             ],
          ),
       );
@@ -71,27 +72,16 @@ while( @pending_queries ) {
 
 $f->get;
 
-is( scalar keys %conns, 3, 'All three servers connected after ->connect' );
+ok( $conns{"10.0.0.1"}, 'Connected to 10.0.0.1' );
+ok( $conn_is_registered{"10.0.0.1"}, 'Using 10.0.0.1 for events' );
 
-# Queries should RR between all three
-{
-   my @f = map { $cass->query( "GET THING", 0 ) } 1 .. 6;
+ok( !defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 does not yet have down_time' );
 
-   is( scalar @pending_queries, 6, '6 pending queries' );
-   my %q_by_nodeid;
-   while( my $q = shift @pending_queries ) {
-      $q_by_nodeid{$q->[0]}++;
-      $q->[2]->done( result => "here" );
-   }
+$conns{"10.0.0.1"}->invoke_event(
+   on_status_change => DOWN => pack_sockaddr_in( 0, inet_aton( "10.0.0.2" ) ),
+);
 
-   is_deeply( \%q_by_nodeid,
-              { "10.0.0.1" => 2,
-                "10.0.0.2" => 2,
-                "10.0.0.3" => 2 },
-              'Queries distributed per node' );
-
-   Future->needs_all( @f )->get;
-}
+ok( defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 has down_time after STATUS_CHANGE DOWN' );
 
 done_testing;
 
@@ -106,15 +96,9 @@ sub query
    return $f;
 }
 
-sub prepare
-{
-   my $self = shift;
-   my ( $cql ) = @_;
-   push @pending_prepares, [ $self->nodeid, $cql, my $f = Future->new ];
-   return $f;
-}
-
 sub register
 {
+   my $self = shift;
+   $conn_is_registered{$self->nodeid}++;
    return Future->new->done;
 }

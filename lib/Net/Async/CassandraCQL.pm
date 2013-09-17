@@ -18,7 +18,7 @@ use Carp;
 use Future::Utils qw( fmap_void );
 use List::Util qw( shuffle );
 use Scalar::Util qw( weaken );
-use Socket qw( inet_ntop AF_INET AF_INET6 );
+use Socket qw( inet_ntop getnameinfo AF_INET AF_INET6 NI_NUMERICHOST NIx_NOSERV );
 
 use Protocol::CassandraCQL qw( CONSISTENCY_ONE );
 
@@ -127,6 +127,11 @@ sub _init
 
    $params->{primaries} //= 1;
 
+   # precache these weasels only once
+   $self->{on_status_change_cb} = $self->_replace_weakself( sub {
+      shift->_on_status_change( @_ );
+   });
+
    $self->SUPER::_init( $params );
 }
 
@@ -151,6 +156,26 @@ sub configure
 =head1 METHODS
 
 =cut
+
+# function
+sub _inet_to_string
+{
+   my ( $addr ) = @_;
+
+   my $addrlen = length $addr;
+   my $family = $addrlen ==  4 ? AF_INET :
+                $addrlen == 16 ? AF_INET6 :
+                die "Expected ADDRLEN 4 or 16";
+   return inet_ntop( $family, $addr );
+}
+
+# function
+sub _nodeid_to_string
+{
+   my ( $node ) = @_;
+
+   return ( getnameinfo( $node, NI_NUMERICHOST, NIx_NOSERV ) )[1];
+}
 
 =head2 $str = $cass->quote( $str )
 
@@ -261,6 +286,12 @@ sub _closed_node
 
       $self->_pick_new_primary( $now );
    }
+
+   if( exists $self->{event_ids}{$nodeid} ) {
+      delete $self->{event_ids}{$nodeid};
+
+      $self->_pick_new_eventwatch;
+   }
 }
 
 sub connect
@@ -312,6 +343,9 @@ sub connect
          push @conn_f, $self->_connect_new_primary( $primary );
          $have_primaries++;
       }
+
+      $self->_pick_new_eventwatch;
+      $self->_pick_new_eventwatch if $have_primaries > 1;
 
       return $conn_f[0] if @conn_f == 1;
       return Future->needs_all( @conn_f );
@@ -396,6 +430,54 @@ sub _ready_node
       } foreach => [ values %$queries ] )
          ->then( sub { $conn_f } );
    });
+}
+
+sub _pick_new_eventwatch
+{
+   my $self = shift;
+
+   my @primaries = keys %{ $self->{primary_ids} };
+
+   {
+      my $nodeid = $primaries[rand @primaries];
+      redo if $self->{event_ids}{$nodeid};
+
+      $self->{event_ids}{$nodeid} = 1;
+
+      my $node = $self->{nodes}{$nodeid};
+      $node->{ready_f}->on_done( sub {
+         my $conn = shift;
+         $conn->configure(
+            on_status_change => $self->{on_status_change_cb},
+         );
+         $conn->register( [qw( STATUS_CHANGE )] )
+            ->on_fail( sub {
+               delete $self->{event_ids}{$nodeid};
+               $self->_pick_new_eventwatch
+            });
+      });
+   }
+}
+
+sub _on_status_change
+{
+   my $self = shift;
+   my ( $status, $addr ) = @_;
+   my $nodeid = _nodeid_to_string( $addr );
+
+   my $node = $self->{nodes}{$nodeid} or return;
+
+   # These updates can happen twice if there's two event connections but
+   # that's OK. Use the state to ensure printing only once
+
+   if( $status eq "DOWN" ) {
+      $self->debug_printf( "STATUS DOWN on {%s}", $nodeid ) if !exists $node->{down_time};
+      $node->{down_time} = time();
+   }
+   elsif( $status eq "UP" ) {
+      $self->debug_printf( "STATUS UP on {%s}", $nodeid ) if exists $node->{down_time};
+      delete $node->{down_time};
+   }
 }
 
 sub _get_a_node
@@ -658,11 +740,7 @@ sub _list_nodes
             $type eq "rows" or Future->new->fail( "Expected 'rows' result" );
             my @nodes = $result->rows_hash;
             foreach my $node ( @nodes ) {
-               my $addrlen = length $node->{peer};
-               my $family = $addrlen ==  4 ? AF_INET :
-                            $addrlen == 16 ? AF_INET6 :
-                            die "Expected ADDRLEN 4 or 16";
-               $node->{host} = inet_ntop( $family, delete $node->{peer} );
+               $node->{host} = _inet_to_string( delete $node->{peer} );
             }
             Future->new->done( @nodes );
          }),
@@ -692,8 +770,7 @@ Allow backup nodes, for faster connection failover.
 
 =item *
 
-Use C<TOPOLGY_CHANGE> and C<STATUS_CHANGE> events to keep the nodelist
-updated.
+Use C<TOPOLGY_CHANGE> events to keep the nodelist updated.
 
 =item *
 

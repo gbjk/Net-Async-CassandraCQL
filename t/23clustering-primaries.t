@@ -33,41 +33,13 @@ my $f = $cass->connect;
 $conn_f{"10.0.0.1"}->done( my $c = $conns{"10.0.0.1"} );
 
 # Initial nodelist query
-while( my $q = $c->next_query ) {
-   if( $q->[1] eq "SELECT data_center, rack FROM system.local" ) {
-      pass( "Query on system.local" );
-      $q->[2]->done( rows =>
-         Protocol::CassandraCQL::Result->new(
-            columns => [
-               [ system => local => data_center => "VARCHAR" ],
-               [ system => local => rack        => "VARCHAR" ],
-            ],
-            rows => [
-               [ "DC1", "rack1" ],
-            ],
-         )
-      );
-   }
-   elsif( $q->[1] eq "SELECT peer, data_center, rack FROM system.peers" ) {
-      pass( "Query on system.peers" );
-      $q->[2]->done( rows =>
-         Protocol::CassandraCQL::Result->new(
-            columns => [
-               [ system => peers => peer        => "VARCHAR" ],
-               [ system => peers => data_center => "VARCHAR" ],
-               [ system => peers => rack        => "VARCHAR" ],
-            ],
-            rows => [
-               [ "\x0a\0\0\2", "DC1", "rack1" ],
-               [ "\x0a\0\0\3", "DC1", "rack1" ],
-            ],
-         ),
-      );
-   }
-   else {
-      fail( "Unexpected initial query $q->[1]" );
-   }
-}
+$c->send_nodelist(
+   local => { dc => "DC1", rack => "rack1" },
+   peers => {
+      "10.0.0.2" => { dc => "DC1", rack => "rack1" },
+      "10.0.0.3" => { dc => "DC1", rack => "rack1" },
+   },
+);
 
 is( scalar keys %conns, 3, 'All three server connect attempts after ->connect' );
 

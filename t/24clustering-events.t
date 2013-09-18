@@ -7,6 +7,7 @@ use Test::More;
 use Test::Identity;
 use Test::Refcount;
 
+use t::MockConnection;
 use Socket qw( pack_sockaddr_in inet_aton );
 
 use Net::Async::CassandraCQL;
@@ -15,13 +16,10 @@ use Protocol::CassandraCQL::Result 0.06;
 # Mock the ->_connect_node method
 no warnings 'redefine';
 my %conns;
-my %conn_is_registered;
 local *Net::Async::CassandraCQL::_connect_node = sub {
    my $self = shift;
    my ( $connect_host, $connect_service ) = @_;
-   $conns{$connect_host} = my $conn = TestConnection->new;
-   delete $conn_is_registered{$connect_host};
-   $conn->{nodeid} = $connect_host;
+   $conns{$connect_host} = my $conn = t::MockConnection->new( $connect_host );
    return Future->new->done( $conn );
 };
 
@@ -31,11 +29,10 @@ my $cass = Net::Async::CassandraCQL->new(
 
 my $f = $cass->connect;
 
-my @pending_queries;
+ok( my $c = $conns{"10.0.0.1"}, 'Connected to 10.0.0.1' );
 
 # Initial nodelist query
-while( @pending_queries ) {
-   my $q = shift @pending_queries;
+while( my $q = $c->next_query ) {
    if( $q->[1] eq "SELECT data_center, rack FROM system.local" ) {
       pass( "Query on system.local" );
       $q->[2]->done( rows =>
@@ -72,8 +69,7 @@ while( @pending_queries ) {
 
 $f->get;
 
-ok( $conns{"10.0.0.1"}, 'Connected to 10.0.0.1' );
-ok( $conn_is_registered{"10.0.0.1"}, 'Using 10.0.0.1 for events' );
+ok( $c->is_registered, 'Using 10.0.0.1 for events' );
 
 ok( !defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 does not yet have down_time' );
 
@@ -84,21 +80,3 @@ $conns{"10.0.0.1"}->invoke_event(
 ok( defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 has down_time after STATUS_CHANGE DOWN' );
 
 done_testing;
-
-package TestConnection;
-use base qw( Net::Async::CassandraCQL::Connection );
-
-sub query
-{
-   my $self = shift;
-   my ( $cql ) = @_;
-   push @pending_queries, [ $self->nodeid, $cql, my $f = Future->new ];
-   return $f;
-}
-
-sub register
-{
-   my $self = shift;
-   $conn_is_registered{$self->nodeid}++;
-   return Future->new->done;
-}

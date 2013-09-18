@@ -116,6 +116,11 @@ C<execute>.
 Optional. The number of primary node connections to maintain. Defaults to 1 if
 not specified.
 
+=item prefer_dc => STRING
+
+Optional. If set, prefer to pick primary nodes from the given data center,
+only falling back on others if there are not enough available.
+
 =back
 
 =cut
@@ -140,7 +145,8 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( host service username password keyspace default_consistency )) {
+   foreach (qw( host service username password keyspace default_consistency
+                prefer_dc )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -294,6 +300,22 @@ sub _closed_node
    }
 }
 
+sub _list_nodeids
+{
+   my $self = shift;
+
+   my $nodes = $self->{nodes};
+
+   my @nodeids = shuffle keys %$nodes;
+   if( defined( my $dc = $self->{prefer_dc} ) ) {
+      # Put preferred ones first
+      @nodeids = ( ( grep { $nodes->{$_}{data_center} eq $dc } @nodeids ),
+                   ( grep { $nodes->{$_}{data_center} ne $dc } @nodeids ) );
+   }
+
+   return @nodeids;
+}
+
 sub connect
 {
    my $self = shift;
@@ -311,7 +333,6 @@ sub connect
       my @nodes = @_;
 
       $self->{nodes} = \my %nodes;
-      my @other_nodeids; # nodeids apart from $conn
       foreach my $node ( @nodes ) {
          my $n = $nodes{$node->{host}} = {
             data_center => $node->{data_center},
@@ -320,9 +341,6 @@ sub connect
 
          if( $node->{host} eq $conn->nodeid ) {
             $n->{conn} = $conn;
-         }
-         else {
-            push @other_nodeids, $node->{host};
          }
       }
 
@@ -338,8 +356,12 @@ sub connect
       $self->debug_printf( "PRIMARY PICKED %s", $conn->nodeid );
       push @conn_f, $primary0->{ready_f} = $self->_ready_node( $conn->nodeid );
 
-      while( @other_nodeids and $have_primaries < $self->{primaries} ) {
-         my ( $primary ) = splice @other_nodeids, rand @other_nodeids, 1, ();
+      my @nodeids = $self->_list_nodeids;
+
+      while( @nodeids and $have_primaries < $self->{primaries} ) {
+         my $primary = shift @nodeids;
+         next if $primary eq $conn->nodeid;
+
          push @conn_f, $self->_connect_new_primary( $primary );
          $have_primaries++;
       }
@@ -363,7 +385,7 @@ sub _pick_new_primary
 
    # Expire old down statuses and try to find a non-down node that is not yet
    # primary
-   foreach my $nodeid ( shuffle keys %$nodes ) {
+   foreach my $nodeid ( $self->_list_nodeids ) {
       my $node = $nodes->{$nodeid};
 
       delete $node->{down_time} if defined $node->{down_time} and $now - $node->{down_time} > NODE_RETRY_TIME;
@@ -787,10 +809,6 @@ Allow backup nodes, for faster connection failover.
 =item *
 
 Use C<TOPOLGY_CHANGE> events to keep the nodelist updated.
-
-=item *
-
-Node preference by C<data_center>.
 
 =back
 

@@ -487,18 +487,46 @@ sub _on_status_change
    my ( $status, $addr ) = @_;
    my $nodeid = _nodeid_to_string( $addr );
 
-   my $node = $self->{nodes}{$nodeid} or return;
+   my $nodes = $self->{nodes};
+   my $node = $nodes->{$nodeid} or return;
 
    # These updates can happen twice if there's two event connections but
    # that's OK. Use the state to ensure printing only once
 
    if( $status eq "DOWN" ) {
-      $self->debug_printf( "STATUS DOWN on {%s}", $nodeid ) if !exists $node->{down_time};
+      return if exists $node->{down_time};
+
+      $self->debug_printf( "STATUS DOWN on {%s}", $nodeid );
       $node->{down_time} = time();
    }
    elsif( $status eq "UP" ) {
-      $self->debug_printf( "STATUS UP on {%s}", $nodeid ) if exists $node->{down_time};
+      return if !exists $node->{down_time};
+
+      $self->debug_printf( "STATUS UP on {%s}", $nodeid );
       delete $node->{down_time};
+
+      return unless defined( my $dc = $self->{prefer_dc} );
+      return unless $node->{data_center} eq $dc;
+      return if $node->{conn};
+
+      # A node in a preferred data center is now up, and we don't already have
+      # a connection to it
+
+      my $old_nodeid;
+      $nodes->{$_}{data_center} ne $dc and $old_nodeid = $_, last for keys %{ $self->{primary_ids} };
+
+      return unless defined $old_nodeid;
+
+      # We do have a connection to a non-preferred node, so lets switch it
+
+      $self->_connect_new_primary( $nodeid );
+
+      # Don't pick it for new nodes
+      $self->debug_printf( "PRIMARY SWITCH %s -> %s", $old_nodeid, $nodeid );
+      delete $self->{primary_ids}{$old_nodeid};
+
+      # Close it when it's empty
+      $nodes->{$old_nodeid}{conn}->close_when_idle;
    }
 }
 

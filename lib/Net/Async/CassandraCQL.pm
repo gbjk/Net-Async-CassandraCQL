@@ -653,6 +653,10 @@ sub query_rows
 Prepares a CQL query for later execution. On success, the returned Future
 yields an instance of a prepared query object (see below).
 
+Query objects stored internally cached by the CQL string; subsequent calls to
+C<prepare> with the same exact CQL string will yield the same object
+immediately, saving a roundtrip.
+
 =cut
 
 sub prepare
@@ -660,9 +664,13 @@ sub prepare
    my $self = shift;
    my ( $cql ) = @_;
 
-   $self->debug_printf( "PREPARE %s", $cql );
-
    my $queries_by_cql = $self->{queries_by_cql};
+
+   if( my $query = $queries_by_cql->{$cql} ) {
+      return Future->new->done( $query );
+   }
+
+   $self->debug_printf( "PREPARE %s", $cql );
 
    my @prepare_f = map {
       my $node = $self->{nodes}{$_}{conn};

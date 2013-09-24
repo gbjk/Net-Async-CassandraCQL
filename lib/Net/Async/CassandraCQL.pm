@@ -137,6 +137,8 @@ sub _init
       shift->_on_status_change( @_ );
    });
 
+   $self->{queries_by_cql} = {}; # {$cql} => $query
+
    $self->SUPER::_init( $params );
 }
 
@@ -440,16 +442,17 @@ sub _ready_node
 
    $keyspace_f->then( sub {
       my $conn_f = Future->new->done( $conn );
-      return $conn_f unless my $queries_by_id = $self->{queries_by_id};
+      return $conn_f unless my $queries_by_cql = $self->{queries_by_cql};
 
       # Expire old ones
-      defined $queries_by_id->{$_} or delete $queries_by_id->{$_} for keys %$queries_by_id;
-      return $conn_f unless keys %$queries_by_id;
+      defined $queries_by_cql->{$_} or delete $queries_by_cql->{$_} for keys %$queries_by_cql;
+
+      return $conn_f unless keys %$queries_by_cql;
 
       ( fmap_void {
          my $query = shift;
          $conn->prepare( $query->cql, $self );
-      } foreach => [ values %$queries_by_id ] )
+      } foreach => [ values %$queries_by_cql ] )
          ->then( sub { $conn_f } );
    });
 }
@@ -659,7 +662,7 @@ sub prepare
 
    $self->debug_printf( "PREPARE %s", $cql );
 
-   my $queries_by_id = $self->{queries_by_id} ||= {};
+   my $queries_by_cql = $self->{queries_by_cql};
 
    my @prepare_f = map {
       my $node = $self->{nodes}{$_}{conn};
@@ -673,8 +676,9 @@ sub prepare
       $self->debug_printf( "PREPARE => [%s]", unpack "H*", $query->id );
 
       # Expire old ones
-      defined $queries_by_id->{$_} or delete $queries_by_id->{$_} for keys %$queries_by_id;
-      weaken( $queries_by_id->{$query->id} = $query );
+      defined $queries_by_cql->{$_} or delete $queries_by_cql->{$_} for keys %$queries_by_cql;
+
+      weaken( $queries_by_cql->{$query->cql} = $query );
 
       Future->new->done( $query );
    });

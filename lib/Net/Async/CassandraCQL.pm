@@ -848,7 +848,7 @@ Allow backup nodes, for faster connection failover.
 
 =item *
 
-Use C<TOPOLGY_CHANGE> events to keep the nodelist updated.
+Use C<TOPOLOGY_CHANGE> events to keep the nodelist updated.
 
 =back
 

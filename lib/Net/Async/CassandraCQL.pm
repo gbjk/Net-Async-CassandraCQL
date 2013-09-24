@@ -440,16 +440,16 @@ sub _ready_node
 
    $keyspace_f->then( sub {
       my $conn_f = Future->new->done( $conn );
-      return $conn_f unless my $queries = $self->{queries};
+      return $conn_f unless my $queries_by_id = $self->{queries_by_id};
 
       # Expire old ones
-      defined $queries->{$_} or delete $queries->{$_} for keys %$queries;
-      return $conn_f unless keys %$queries;
+      defined $queries_by_id->{$_} or delete $queries_by_id->{$_} for keys %$queries_by_id;
+      return $conn_f unless keys %$queries_by_id;
 
       ( fmap_void {
          my $query = shift;
          $conn->prepare( $query->cql, $self );
-      } foreach => [ values %$queries ] )
+      } foreach => [ values %$queries_by_id ] )
          ->then( sub { $conn_f } );
    });
 }
@@ -659,7 +659,7 @@ sub prepare
 
    $self->debug_printf( "PREPARE %s", $cql );
 
-   my $queries = $self->{queries} ||= {};
+   my $queries_by_id = $self->{queries_by_id} ||= {};
 
    my @prepare_f = map {
       my $node = $self->{nodes}{$_}{conn};
@@ -673,8 +673,8 @@ sub prepare
       $self->debug_printf( "PREPARE => [%s]", unpack "H*", $query->id );
 
       # Expire old ones
-      defined $queries->{$_} or delete $queries->{$_} for keys %$queries;
-      weaken( $queries->{$query->id} = $query );
+      defined $queries_by_id->{$_} or delete $queries_by_id->{$_} for keys %$queries_by_id;
+      weaken( $queries_by_id->{$query->id} = $query );
 
       Future->new->done( $query );
    });

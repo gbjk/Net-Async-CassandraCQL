@@ -6,6 +6,7 @@ use warnings;
 use Test::More;
 use Test::Identity;
 use Test::HexString;
+use Test::Refcount;
 
 use IO::Async::Test;
 use IO::Async::OS;
@@ -57,17 +58,23 @@ $loop->add( $cass );
    wait_for { $f->is_ready };
 
    my $query = $f->get;
+   undef $f;
+
+   is_oneref( $query, '$query has refcount 1 after ->prepare' );
+
    is( $query->id, "0123456789ABCDEF", '$query->id after ->prepare->get' );
    is( $query->cql, "INSERT INTO t (f) = (?)", '$query->cql after ->prepare->get' );
    is( $query->columns, 1, '$query->columns' );
    is( scalar $query->column_name(0), "test.t.f", '$query->column_name(0)' );
    is( $query->column_type(0)->name, "VARCHAR", '$query->column_type(0)->name' );
 
-   my $f2 = $cass->prepare( "INSERT INTO t (f) = (?)" );
+   {
+      my $f2 = $cass->prepare( "INSERT INTO t (f) = (?)" );
 
-   ok( $f2->is_ready, 'Duplicate prepare is ready immediately' );
+      ok( $f2->is_ready, 'Duplicate prepare is ready immediately' );
 
-   identical( scalar $f2->get, $query, 'Duplicate prepare yields same object' );
+      identical( scalar $f2->get, $query, 'Duplicate prepare yields same object' );
+   }
 
    # ->execute directly
    $f = $cass->execute( $query, [ "more-data" ], CONSISTENCY_ANY );
@@ -134,6 +141,8 @@ $loop->add( $cass );
 
    is_deeply( [ $f->get ], [],
               '->execute returns nothing' );
+
+   is_oneref( $query, '$query has refcount 1 before EOF' );
 }
 
 done_testing;

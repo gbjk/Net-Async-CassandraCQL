@@ -106,14 +106,16 @@ $loop->add( $conn );
    my $stream = "";
    wait_for_stream { length $stream >= 8 } $S2 => $stream;
 
-   $conn->close_when_idle;
+   my $close_f = $conn->close_when_idle;
    ok( !$closed, 'Stream not yet closed before reply' );
+   ok( !$close_f->is_ready, 'close future not yet ready' );
 
    $S2->syswrite( "\x81\x00\x01\x05\0\0\0\0" );
 
    wait_for { $f->is_ready };
 
    ok( $closed, 'Stream now closed after reply' );
+   is( scalar $close_f->get, $conn, 'close future ready and yields $conn' );
 }
 
 done_testing;

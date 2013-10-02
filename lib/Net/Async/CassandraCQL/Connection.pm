@@ -222,8 +222,8 @@ sub on_read
          my ( $opcode, $frame, $f ) = @$next;
          $self->_send( $opcode, $streamid, $frame, $f );
       }
-      elsif( $self->{conn_closing} and !$self->_has_pending ) {
-         $self->close;
+      elsif( my $close_f = $self->{cassandra_close_future} and !$self->_has_pending ) {
+         $close_f->done( $self );
       }
    }
    elsif( $streamid == 0 and $opcode == OPCODE_ERROR ) {
@@ -320,7 +320,7 @@ sub send_message
    my $self = shift;
    my ( $opcode, $frame ) = @_;
 
-   croak "Cannot ->send_message when in close-pending state" if $self->{conn_closing};
+   croak "Cannot ->send_message when in close-pending state" if $self->{cassandra_close_future};
 
    my $f = $self->loop->new_future;
 
@@ -565,11 +565,14 @@ sub register
    });
 }
 
-=head2 $conn->close_when_idle
+=head2 $conn->close_when_idle ==> $conn
 
 If the connection is idle (has no outstanding queries), then it is closed
 immediately. If not, it is put into close-pending mode, where it will accept
 no more queries, and will close when the last pending one is complete.
+
+Returns a future which will eventually yield the (closed) connection when it
+becomes closed.
 
 =cut
 
@@ -577,12 +580,14 @@ sub close_when_idle
 {
    my $self = shift;
 
-   if( $self->_has_pending ) {
-      $self->{conn_closing} = 1;
-   }
-   else {
-      $self->close;
-   }
+   $self->{cassandra_close_future} ||= do {
+      my $f = $self->loop->new_future;
+      $f->on_done( sub { $_[0]->close } );
+
+      $f->done( $self ) if !$self->_has_pending;
+
+      $f
+   };
 }
 
 =head1 SPONSORS

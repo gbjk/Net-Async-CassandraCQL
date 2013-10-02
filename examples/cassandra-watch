@@ -27,22 +27,15 @@ $loop->add( $cass );
 
 $cass->connect->get;
 
-$cass->configure( on_status_change => sub {
-   my $self = shift;
-   my ( $status, $nodeaddr ) = @_;
-
-   my ( $err, $host, $port ) = getnameinfo( $nodeaddr, NI_NUMERICHOST|NI_NUMERICSERV );
-   die "$err" if $err;
-
-   print "STATUS_CHANGE $status $host:$port\n";
-});
-
-$cass->configure( on_event => sub {
-   my $self = shift;
-
-   print STDERR "EVENT: @_\n";
-});
-
-$cass->register( [qw( TOPOLOGY_CHANGE STATUS_CHANGE SCHEMA_CHANGE )] )->get;
+$cass->configure(
+   on_node_up => sub {
+      my ( undef, $nodeid ) = @_;
+      print "NODE UP $nodeid\n";
+   },
+   on_node_down => sub {
+      my ( undef, $nodeid ) = @_;
+      print "NODE DOWN $nodeid\n";
+   },
+);
 
 $loop->run;

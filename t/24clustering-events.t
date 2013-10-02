@@ -23,8 +23,10 @@ local *Net::Async::CassandraCQL::_connect_node = sub {
    return Future->new->done( $conn );
 };
 
+my ( $nodeid );
 my $cass = Net::Async::CassandraCQL->new(
    host => "10.0.0.1",
+   on_node_down => sub { ( undef, $nodeid ) = @_; },
 );
 
 my $f = $cass->connect;
@@ -50,5 +52,6 @@ $conns{"10.0.0.1"}->invoke_event(
 );
 
 ok( defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 has down_time after STATUS_CHANGE DOWN' );
+is( $nodeid, "10.0.0.2", '$nodeid to cluster on_node_down' );
 
 done_testing;

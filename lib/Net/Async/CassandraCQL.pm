@@ -81,6 +81,22 @@ behaviours and limits of its ability to communicate with Cassandra.
 
 =cut
 
+=head1 EVENTS
+
+=head2 on_node_up $nodeid
+
+=head2 on_node_down $nodeid
+
+The node's status has changed. C<$nodeid> is the node's IP address as a text
+string.
+
+Obtained from event watches on the actual node connections and filtered to
+avoid duplicates. The use of multiple primaries should improve the reliability
+of notifications, though if multiple nodes fail at or around the same time
+this may go unreported, as no node will ever report its own failure.
+
+=cut
+
 =head1 PARAMETERS
 
 The following named parameters may be passed to C<new> or C<configure>:
@@ -151,7 +167,7 @@ sub configure
    my %params = @_;
 
    foreach (qw( host service username password keyspace default_consistency
-                prefer_dc )) {
+                prefer_dc on_node_up on_node_down )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -500,12 +516,16 @@ sub _on_status_change
       return if exists $node->{down_time};
 
       $self->debug_printf( "STATUS DOWN on {%s}", $nodeid );
+      $self->maybe_invoke_event( on_node_down => $nodeid );
+
       $node->{down_time} = time();
    }
    elsif( $status eq "UP" ) {
       return if !exists $node->{down_time};
 
       $self->debug_printf( "STATUS UP on {%s}", $nodeid );
+      $self->maybe_invoke_event( on_node_up => $nodeid );
+
       delete $node->{down_time};
 
       return unless defined( my $dc = $self->{prefer_dc} );

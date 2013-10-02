@@ -285,6 +285,7 @@ sub _closed_node
 
    my $now = time();
 
+   $self->{nodes} or return;
    my $node = $self->{nodes}{$nodeid} or return;
 
    undef $node->{conn};
@@ -532,11 +533,44 @@ sub _on_status_change
    }
 }
 
-sub _get_a_node
+=head2 $cass->close_when_idle ==> $cass
+
+Stops accepting new queries and prepares all the existing connections to be
+closed once every outstanding query has been responded to. Returns a future
+that will eventually yield the CassandraCQL object, when all the connections
+are closed.
+
+After calling this method it will be an error to invoke C<query>, C<prepare>,
+C<execute> or the various other methods derived from them.
+
+=cut
+
+sub close_when_idle
 {
    my $self = shift;
 
    my $nodes = $self->{nodes};
+
+   # remove 'nodes' to avoid reconnect logic
+   undef $self->{nodes};
+   undef $self->{primary_ids};
+
+   my @f;
+   foreach my $node ( values %$nodes ) {
+      next unless my $conn = $node->{conn};
+      push @f, $conn->close_when_idle;
+   }
+
+   return Future->wait_all( @f )->then( sub {
+      return Future->new->done( $self );
+   });
+}
+
+sub _get_a_node
+{
+   my $self = shift;
+
+   my $nodes = $self->{nodes} or die "No available nodes";
 
    # TODO: Other sorting strategies;
    #   e.g. fewest outstanding queries, least accumulated time recently
@@ -663,6 +697,8 @@ sub prepare
    my $self = shift;
    my ( $cql ) = @_;
 
+   my $nodes = $self->{nodes} or die "No available nodes";
+
    my $queries_by_cql = $self->{queries_by_cql};
 
    if( my $q = $queries_by_cql->{$cql} ) {
@@ -678,7 +714,7 @@ sub prepare
    $self->debug_printf( "PREPARE %s", $cql );
 
    my @prepare_f = map {
-      my $node = $self->{nodes}{$_}{conn};
+      my $node = $nodes->{$_}{conn};
       $node->prepare( $cql, $self )
    } keys %{ $self->{primary_ids} };
 

@@ -19,6 +19,7 @@ local *Net::Async::CassandraCQL::_connect_node = sub {
    my $self = shift;
    my ( $connect_host, $connect_service ) = @_;
    $conns{$connect_host} = my $conn = t::MockConnection->new( $connect_host );
+   $self->add_child( $conn );
    return Future->new->done( $conn );
 };
 
@@ -132,5 +133,17 @@ ok( $c = $conns{"10.0.0.2"}, 'new primary node picked' );
 # $query->DESTROY will try to register it for late expiry on the underlying
 # Cassandra object. We can convince it not to do that
 undef $query->{cassandra};
+
+{
+   require IO::Async::Loop;
+   my $loop = IO::Async::Loop->new;
+   $loop->add( $cass );
+
+   my $f = $cass->close_when_idle;
+
+   identical( scalar $f->get, $cass, '->close_when_idle future yields $cass' );
+
+   $loop->remove( $cass );
+}
 
 done_testing;

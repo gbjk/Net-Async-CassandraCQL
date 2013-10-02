@@ -566,6 +566,31 @@ sub close_when_idle
    });
 }
 
+=head2 $cass->close_now
+
+Immediately closes all node connections and shuts down the object. Any
+outstanding or queued queries will immediately fail. Consider this as a "last
+resort" failure shutdown, as compared to the graceful draining behaviour of
+C<close_when_idle>.
+
+=cut
+
+sub close_now
+{
+   my $self = shift;
+
+   my $nodes = $self->{nodes};
+
+   # remove 'nodes' to avoid reconnect logic
+   undef $self->{nodes};
+   undef $self->{primary_ids};
+
+   foreach my $node ( values %$nodes ) {
+      next unless my $conn = $node->{conn};
+      $conn->close_now;
+   }
+}
+
 sub _get_a_node
 {
    my $self = shift;

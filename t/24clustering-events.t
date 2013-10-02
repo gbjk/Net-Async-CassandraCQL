@@ -23,10 +23,8 @@ local *Net::Async::CassandraCQL::_connect_node = sub {
    return Future->new->done( $conn );
 };
 
-my ( $nodeid );
 my $cass = Net::Async::CassandraCQL->new(
    host => "10.0.0.1",
-   on_node_down => sub { ( undef, $nodeid ) = @_; },
 );
 
 my $f = $cass->connect;
@@ -45,13 +43,31 @@ $f->get;
 
 ok( $c->is_registered, 'Using 10.0.0.1 for events' );
 
-ok( !defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 does not yet have down_time' );
+{
+   my $nodeid;
+   $cass->configure(
+      on_node_up   => sub { ( undef, $nodeid ) = @_; },
+      on_node_down => sub { ( undef, $nodeid ) = @_; },
+   );
 
-$conns{"10.0.0.1"}->invoke_event(
-   on_status_change => DOWN => pack_sockaddr_in( 0, inet_aton( "10.0.0.2" ) ),
-);
+   # DOWN
+   ok( !defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 does not yet have down_time' );
 
-ok( defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 has down_time after STATUS_CHANGE DOWN' );
-is( $nodeid, "10.0.0.2", '$nodeid to cluster on_node_down' );
+   $conns{"10.0.0.1"}->invoke_event(
+      on_status_change => DOWN => pack_sockaddr_in( 0, inet_aton( "10.0.0.2" ) ),
+   );
+
+   ok( defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 has down_time after STATUS_CHANGE DOWN' );
+   is( $nodeid, "10.0.0.2", '$nodeid to cluster on_node_down' );
+   undef $nodeid;
+
+   # UP
+   $conns{"10.0.0.1"}->invoke_event(
+      on_status_change => UP => pack_sockaddr_in( 0, inet_aton( "10.0.0.2" ) ),
+   );
+
+   ok( !defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 no longer has down_time after STATUS_CHANGE UP' );
+   is( $nodeid, "10.0.0.2", '$nodeid to cluster on_node_up' );
+}
 
 done_testing;

@@ -90,10 +90,18 @@ behaviours and limits of its ability to communicate with Cassandra.
 The node's status has changed. C<$nodeid> is the node's IP address as a text
 string.
 
-Obtained from event watches on the actual node connections and filtered to
-avoid duplicates. The use of multiple primaries should improve the reliability
-of notifications, though if multiple nodes fail at or around the same time
-this may go unreported, as no node will ever report its own failure.
+=head2 on_node_new $nodeid
+
+=head2 on_node_removed $nodeid
+
+A new node has been added to the cluster, or an existing node has been
+decommissioned and removed.
+
+These four events are obtained from event watches on the actual node
+connections and filtered to remove duplicates. The use of multiple primaries
+should improve the reliability of notifications, though if multiple nodes fail
+at or around the same time this may go unreported, as no node will ever report
+its own failure.
 
 =cut
 
@@ -149,6 +157,9 @@ sub _init
    $params->{primaries} //= 1;
 
    # precache these weasels only once
+   $self->{on_topology_change_cb} = $self->_replace_weakself( sub {
+      shift->_on_topology_change( @_ );
+   });
    $self->{on_status_change_cb} = $self->_replace_weakself( sub {
       shift->_on_status_change( @_ );
    });
@@ -167,7 +178,7 @@ sub configure
    my %params = @_;
 
    foreach (qw( host service username password keyspace default_consistency
-                prefer_dc on_node_up on_node_down )) {
+                prefer_dc on_node_up on_node_down on_node_new on_node_removed )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -489,14 +500,52 @@ sub _pick_new_eventwatch
       $node->{ready_f}->on_done( sub {
          my $conn = shift;
          $conn->configure(
+            on_topology_change => $self->{on_topology_change_cb},
             on_status_change   => $self->{on_status_change_cb},
          );
-         $conn->register( [qw( STATUS_CHANGE )] )
+         $conn->register( [qw( TOPOLOGY_CHANGE STATUS_CHANGE )] )
             ->on_fail( sub {
                delete $self->{event_ids}{$nodeid};
                $self->_pick_new_eventwatch
             });
       });
+   }
+}
+
+sub _on_topology_change
+{
+   my $self = shift;
+   my ( $type, $addr ) = @_;
+   my $nodeid = _nodeid_to_string( $addr );
+
+   my $nodes = $self->{nodes};
+
+   # These updates can happen twice if there's two event connections but
+   # that's OK. Use the state to ensure printing only once
+
+   if( $type eq "NEW_NODE" ) {
+      return if exists $nodes->{$nodeid};
+
+      $nodes->{$nodeid} = {};
+
+      $self->query_rows( "SELECT peer, data_center, rack FROM system.peers WHERE peer = " . $self->quote( $nodeid ), CONSISTENCY_ONE )
+         ->on_done( sub {
+            my ( $result ) = @_;
+            my $node = $result->row_hash( 0 );
+            $node->{host} = _inet_to_string( delete $node->{peer} );
+
+            %{$nodes->{$nodeid}} = %$node;
+
+            $self->debug_printf( "NEW_NODE {%s}", $nodeid );
+            $self->maybe_invoke_event( on_node_new => $nodeid );
+         });
+   }
+   elsif( $type eq "REMOVED_NODE" ) {
+      return if !exists $nodes->{$nodeid};
+
+      delete $nodes->{$nodeid};
+      $self->debug_printf( "REMOVED_NODE {%s}", $nodeid );
+      $self->maybe_invoke_event( on_node_removed => $nodeid );
    }
 }
 
@@ -948,10 +997,6 @@ Adjust connected primary nodes when changing C<primaries> parameter.
 =item *
 
 Allow backup nodes, for faster connection failover.
-
-=item *
-
-Use C<TOPOLOGY_CHANGE> events to keep the nodelist updated.
 
 =back
 

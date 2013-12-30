@@ -172,7 +172,7 @@ sub connect
 
    return ( $self->{connect_f} ||=
       $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } ) )
-      ->and_then( sub {
+      ->then( sub {
          $self->{nodeid} = $self->read_handle->peerhost;
          $self->startup
       })->then( sub { Future->new->done( $self ) });

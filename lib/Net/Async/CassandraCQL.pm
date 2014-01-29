@@ -1,7 +1,7 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2013-2014 -- leonerd@leonerd.org.uk
 
 package Net::Async::CassandraCQL;
 
@@ -355,6 +355,9 @@ sub connect
    my %args = @_;
 
    my $conn;
+
+   my $host = $args{host} // $self->{host};
+   defined $host or croak "Require a 'host' to ->connect to";
 
    $self->_connect_node(
       $args{host}    // $self->{host},

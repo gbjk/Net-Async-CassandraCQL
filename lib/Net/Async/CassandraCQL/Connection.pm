@@ -25,7 +25,7 @@ use Protocol::CassandraCQL qw(
    build_frame parse_frame
 );
 use Protocol::CassandraCQL::Frame;
-use Protocol::CassandraCQL::Frames qw( :all );
+use Protocol::CassandraCQL::Frames 0.10 qw( :all );
 
 use Net::Async::CassandraCQL::Query;
 
@@ -472,9 +472,17 @@ sub prepare
       my ( $op, $response ) = @_;
       $op == OPCODE_RESULT or return Future->new->fail( "Expected OPCODE_RESULT" );
 
-      $response->unpack_int == RESULT_PREPARED or return Future->new->fail( "Expected RESULT_PREPARED" );
+      my ( $type, $result ) = parse_result_frame( 1, $response );
+      $type == RESULT_PREPARED or return Future->new->fail( "Expected RESULT_PREPARED" );
 
-      my $query = Net::Async::CassandraCQL::Query->from_frame( $cassandra, $cql, $response );
+      my ( $id, $params_meta ) = @$result;
+
+      my $query = Net::Async::CassandraCQL::Query->new(
+         cassandra   => $cassandra,
+         cql         => $cql,
+         id          => $id,
+         params_meta => $params_meta,
+      );
       return Future->new->done( $query );
    });
 }

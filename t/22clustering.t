@@ -81,12 +81,14 @@ my $query;
 
    $p->[2]->done(
       Net::Async::CassandraCQL::Query->new(
-         cassandra => $cass,
-         cql       => $p->[1],
-         id        => "0123456789ABCDEF",
-         columns   => [
-            [ test => t => f => "VARINT" ],
-         ],
+         cassandra   => $cass,
+         cql         => $p->[1],
+         id          => "0123456789ABCDEF",
+         params_meta => Protocol::CassandraCQL::ColumnMeta->new(
+            columns   => [
+               [ test => t => f => "VARINT" ],
+            ],
+         ),
       )
    );
 

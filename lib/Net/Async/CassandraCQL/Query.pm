@@ -1,13 +1,12 @@
 #  You may distribute under the terms of either the GNU General Public License
 #  or the Artistic License (the same terms as Perl itself)
 #
-#  (C) Paul Evans, 2013 -- leonerd@leonerd.org.uk
+#  (C) Paul Evans, 2013-2014 -- leonerd@leonerd.org.uk
 
 package Net::Async::CassandraCQL::Query;
 
 use strict;
 use warnings;
-use base qw( Protocol::CassandraCQL::ColumnMeta );
 
 our $VERSION = '0.09';
 
@@ -26,36 +25,26 @@ L<Net::Async::CassandraCQL> to represent a prepared query in the server. They
 can be executed multiple times, if required, by passing the values of the
 placeholders to the C<execute> method.
 
-This is a subclass of L<Protocol::CassandraCQL::ColumnMeta>.
+For backward compatibility, as this object class is no longer a subclass of
+L<Protocol::CassandraCQL::ColumnMeta>, the following methods will be directed
+to the C<params_meta> instance.
+
+ columns column_name column_shortname column_type find_column
+ encode_data decode_data
 
 =cut
-
-sub from_frame
-{
-   my $class = shift;
-   my ( $cassandra, $cql, $response ) = @_;
-
-   my $id = $response->unpack_short_bytes;
-
-   my $self = $class->SUPER::from_frame( $response );
-
-   $self->{cassandra} = $cassandra;
-   $self->{cql}       = $cql;
-   $self->{id}        = $id;
-
-   return $self;
-}
 
 sub new
 {
    my $class = shift;
    my %args = @_;
 
-   my $self = $class->SUPER::new( %args );
-
-   $self->{cassandra} = $args{cassandra};
-   $self->{cql}       = $args{cql};
-   $self->{id}        = $args{id};
+   my $self = bless {
+      cassandra   => $args{cassandra},
+      cql         => $args{cql},
+      id          => $args{id},
+      params_meta => $args{params_meta},
+   }, $class;
 
    return $self;
 }
@@ -72,6 +61,15 @@ sub DESTROY
 =head1 METHODS
 
 =cut
+
+foreach my $method (qw( columns column_name column_shortname column_type find_column
+                        encode_data decode_data )) {
+   no strict 'refs';
+   *$method = sub {
+      my $self = shift;
+      $self->params_meta->$method( @_ )
+   };
+}
 
 =head2 $id = $query->id
 
@@ -95,6 +93,19 @@ sub cql
 {
    my $self = shift;
    return $self->{cql};
+}
+
+=head2 $meta = $query->params_meta
+
+Returns a L<Protocol::CassandraCQL::ColumnMeta> instance with the metadata
+about the bind parameters.
+
+=cut
+
+sub params_meta
+{
+   my $self = shift;
+   return $self->{params_meta};
 }
 
 =head2 $query->execute( $data, $consistency ) ==> ( $type, $result )

@@ -15,7 +15,7 @@ use base qw( IO::Async::Notifier );
 
 use Carp;
 
-use Future::Utils qw( fmap_void );
+use Future::Utils qw( fmap_void try_repeat_until_success );
 use List::Util qw( shuffle );
 use Scalar::Util qw( weaken );
 use Socket qw( inet_ntop getnameinfo AF_INET AF_INET6 NI_NUMERICHOST NIx_NOSERV );
@@ -113,7 +113,11 @@ The following named parameters may be passed to C<new> or C<configure>:
 
 =item host => STRING
 
-The hostname of the Cassandra node to connect to
+=item hosts => ARRAY of STRING
+
+The hostnames of Cassandra node to connect to initially. If more than one host
+is provided in an array, they will be attempted sequentially until one
+succeeds during the intial connect phase.
 
 =item service => STRING
 
@@ -177,7 +181,11 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( host service username password keyspace default_consistency
+   if( defined $params{host} ) {
+      $params{hosts} ||= [ delete $params{host} ];
+   }
+
+   foreach (qw( hosts service username password keyspace default_consistency
                 prefer_dc on_node_up on_node_down on_node_new on_node_removed )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
@@ -266,13 +274,15 @@ Takes the following named arguments:
 
 =item host => STRING
 
+=item hosts => ARRAY of STRING
+
 =item service => STRING
 
 =back
 
-A host name is required, either as a named argument or as a configured value
-on the object. If the service name is missing, the default CQL port will be
-used instead.
+A set of host names are required, either as a named argument or as a
+configured value on the object. If the service name is missing, the default
+CQL port will be used instead.
 
 =cut
 
@@ -356,13 +366,14 @@ sub connect
 
    my $conn;
 
-   my $host = $args{host} // $self->{host};
-   defined $host or croak "Require a 'host' to ->connect to";
+   my @hosts = $args{hosts}        ? @{ $args{hosts} } :
+               defined $args{host} ? ( $args{host} ) :
+                                     @{ $self->{hosts} || [] };
+   @hosts or croak "Require initial hostnames to ->connect to";
 
-   $self->_connect_node(
-      $args{host}    // $self->{host},
-      $args{service},
-   )->then( sub {
+   ( try_repeat_until_success {
+      $self->_connect_node( $_[0], $args{service} )
+   } foreach => \@hosts )->then( sub {
       ( $conn ) = @_;
       $self->_list_nodes( $conn );
    })->then( sub {

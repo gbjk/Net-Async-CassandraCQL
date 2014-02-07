@@ -170,4 +170,36 @@ $loop->add( $cass );
        '$cass has no more cached queries after timer expire' );
 }
 
+# CQL v2 returns result metadata from PREPARED, so we should use no_metadata on
+# execute
+{
+   $cass->configure( cql_version => 2 );
+   $conn->configure( cql_version => 2 );
+
+   my $f = $cass->prepare( "SELECT a, b FROM table WHERE b = ?" );
+
+   my $stream = "";
+   wait_for_stream { length $stream >= 8 + 38 } $S2 => $stream; # TODO
+
+   # OPCODE_PREPARE
+   is_hexstr( $stream,
+              "\x02\x00\x01\x09\0\0\0\x26" .
+                 "\0\0\0\x22SELECT a, b FROM table WHERE b = ?",
+              'stream after ->prepare v2' );
+
+   # OPCODE_RESULT
+   $S2->syswrite( "\x82\x00\x01\x08\0\0\0\x4f\0\0\0\4" .
+                     "\x00\x100123456789ABCDFE" .
+                     "\0\0\0\1\0\0\0\1\0\4test\0\5table\0\1b\x00\x0D" .
+                     "\0\0\0\1\0\0\0\2\0\4test\0\5table\0\1a\x00\x09\0\1b\x00\x09" );
+
+   wait_for { $f->is_ready };
+
+   my $query = $f->get;
+
+   is( $query->params, 1, '$query->params' );
+   ok( defined $query->result_meta, '$query->result_meta defined' );
+   is( $query->result_meta->columns, 2, '$query->result_meta->columns' );
+}
+
 done_testing;

@@ -48,6 +48,7 @@ sub new
       cql         => $args{cql},
       id          => $args{id},
       params_meta => $args{params_meta},
+      result_meta => $args{result_meta},
    }, $class;
 
    return $self;
@@ -130,6 +131,20 @@ sub params          { shift->params_meta->columns }
 sub param_name      { shift->params_meta->column_name( @_ ) }
 sub param_shortname { shift->params_meta->column_shortname( @_ ) }
 sub param_type      { shift->params_meta->column_type( @_ ) }
+
+=head2 $meta = $query->result_meta
+
+Returns a L<Protocol::CassandraCQL::ColumnMeta> instance with the metadata
+about the query result. This will only be defined on connections with a
+C<cql_version> of 2 or above.
+
+=cut
+
+sub result_meta
+{
+   my $self = shift;
+   return $self->{result_meta};
+}
 
 =head2 $query->execute( $data, $consistency ) ==> ( $type, $result )
 

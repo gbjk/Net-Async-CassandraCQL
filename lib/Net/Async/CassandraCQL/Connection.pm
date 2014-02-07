@@ -497,13 +497,14 @@ sub prepare
       my ( $type, $result ) = parse_result_frame( $version, $response );
       $type == RESULT_PREPARED or return Future->new->fail( "Expected RESULT_PREPARED" );
 
-      my ( $id, $params_meta ) = @$result;
+      my ( $id, $params_meta, $result_meta ) = @$result;
 
       my $query = Net::Async::CassandraCQL::Query->new(
          cassandra   => $cassandra,
          cql         => $cql,
          id          => $id,
          params_meta => $params_meta,
+         result_meta => $result_meta, # v2+ only
       );
       return Future->new->done( $query );
    });

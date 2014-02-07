@@ -18,7 +18,7 @@ use Carp;
 
 use Future 0.13;
 
-use Compress::Snappy qw( compress decompress );
+use constant HAVE_SNAPPY => eval { require Compress::Snappy };
 
 use Protocol::CassandraCQL qw(
    :opcodes :results :consistencies FLAG_COMPRESS
@@ -206,9 +206,9 @@ sub on_read
    $version <= $self->_version or
       $self->fail_all_and_close( sprintf "Unexpected message version %#02x\n", $version ), return;
 
-   if( $flags & FLAG_COMPRESS ) {
+   if( HAVE_SNAPPY and $flags & FLAG_COMPRESS ) {
       $flags &= ~FLAG_COMPRESS;
-      $body = decompress( $body );
+      $body = Compress::Snappy::decompress( $body );
    }
 
    $flags == 0 or
@@ -345,10 +345,12 @@ sub _send
    my $flags = 0;
    my $body = $frame->bytes;
 
-   my $body_compressed = compress( $body );
-   if( length $body_compressed < length $body ) {
-      $flags |= FLAG_COMPRESS;
-      $body = $body_compressed;
+   if( HAVE_SNAPPY ) {
+      my $body_compressed = Compress::Snappy::compress( $body );
+      if( length $body_compressed < length $body ) {
+         $flags |= FLAG_COMPRESS;
+         $body = $body_compressed;
+      }
    }
 
    $self->write( build_frame( $self->_version, $flags, $id, $opcode, $body ) );
@@ -372,7 +374,7 @@ sub startup
    $self->send_message( OPCODE_STARTUP, build_startup_frame( $self->_version,
       options => {
          CQL_VERSION => "3.0.5",
-         COMPRESSION => "Snappy",
+         ( HAVE_SNAPPY ? ( COMPRESSION => "Snappy" ) : () ),
       } )
    )->then( sub {
       my ( $op, $response, $version ) = @_;

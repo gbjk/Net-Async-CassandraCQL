@@ -30,17 +30,30 @@ $loop->add( $conn );
    my $f = $conn->startup;
 
    my $stream = "";
-   wait_for_stream { length $stream >= 8 + 22 } $S2 => $stream;
 
-   # OPCODE_STARTUP
-   # Since this map will contain 2 elements, we'll have to detect the order
-   # and supply the appropriate bytestring
-   is_hexstr( $stream,
-              "\x01\x00\x01\x01\0\0\0\x2b" .
-                 "\x00\x02" . ( $stream =~ m/CQL_VERSION.*COMPRESSION/
-                    ? "\x00\x0bCQL_VERSION\x00\x053.0.5\x00\x0bCOMPRESSION\x00\x06Snappy"
-                    : "\x00\x0bCOMPRESSION\x00\x06Snappy\x00\x0bCQL_VERSION\x00\x053.0.5" ),
-              'stream after ->startup' );
+   if( Net::Async::CassandraCQL::Connection::HAVE_SNAPPY ) {
+      wait_for_stream { length $stream >= 8 + 43 } $S2 => $stream;
+
+      # OPCODE_STARTUP
+      # Since this map will contain 2 elements, we'll have to detect the order
+      # and supply the appropriate bytestring
+      is_hexstr( $stream,
+                 "\x01\x00\x01\x01\0\0\0\x2b" .
+                    "\x00\x02" . ( $stream =~ m/CQL_VERSION.*COMPRESSION/
+                       ? "\x00\x0bCQL_VERSION\x00\x053.0.5\x00\x0bCOMPRESSION\x00\x06Snappy"
+                       : "\x00\x0bCOMPRESSION\x00\x06Snappy\x00\x0bCQL_VERSION\x00\x053.0.5" ),
+                 'stream after ->startup' );
+   }
+   else {
+      wait_for_stream { length $stream >= 8 + 22 } $S2 => $stream;
+
+      # OPCODE_STARTUP
+      is_hexstr( $stream,
+                 "\x01\x00\x01\x01\0\0\0\x16" .
+                    "\x00\x01" .
+                       "\x00\x0bCQL_VERSION\x00\x053.0.5",
+                 'stream after ->startup' );
+   }
 
    # OPCODE_READY
    $S2->syswrite( "\x81\x00\x01\x02\0\0\0\0" );

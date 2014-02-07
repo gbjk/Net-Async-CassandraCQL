@@ -6,7 +6,6 @@ use Module::Build;
 my $build = Module::Build->new(
    module_name => 'Net::Async::CassandraCQL',
    requires => {
-      'Compress::Snappy' => 0,
       'Devel::GlobalDestruction' => 0,
       'Future' => '0.17', # immediate bugfixes
       'IO::Async::Loop' => '0.54', # ->connect returns Future
@@ -21,6 +20,9 @@ my $build = Module::Build->new(
       'Test::Identity' => 0,
       'Test::More' => '0.88', # done_testing
       'Test::Refcount' => 0,
+   },
+   recommends => {
+      'Compress::Snappy' => 0,
    },
    auto_configure_requires => 0, # Don't add M::B to configure_requires
    license => 'perl',

@@ -181,7 +181,14 @@ sub execute
 
    my @bytes = $params_meta->encode_data( @data );
 
-   return $self->{cassandra}->execute( $self, \@bytes, $consistency );
+   return $self->{cassandra}->execute(
+      $self, \@bytes, $consistency,
+      skip_metadata => defined $self->result_meta,
+   )->on_done( sub {
+      my ( $type, $result ) = @_;
+
+      $result->set_metadata( $self->result_meta ) if $result and !$result->has_metadata;
+   });
 }
 
 =head1 SPONSORS

@@ -12,7 +12,7 @@ my $build = Module::Build->new(
       'IO::Async::Loop' => '0.54', # ->connect returns Future
       'IO::Async::Stream' => '0.59',
       'IO::Socket::IP' => 0,
-      'Protocol::CassandraCQL' => '0.10', # prepared statement ID bugfix
+      'Protocol::CassandraCQL' => '0.11', # parse_results_frame v2 bugfix, ->has_metadata
    },
    build_requires => {
       'IO::Async::Test' => 0,

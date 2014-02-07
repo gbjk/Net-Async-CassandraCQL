@@ -1036,10 +1036,6 @@ sub _list_nodes
 
 =item *
 
-Allow storing multiple Cassandra seed node hostnames for startup.
-
-=item *
-
 Allow other load-balancing strategies than roundrobin.
 
 =item *
@@ -1049,6 +1045,12 @@ Adjust connected primary nodes when changing C<primaries> parameter.
 =item *
 
 Allow backup nodes, for faster connection failover.
+
+=item *
+
+Support LZ4 compression when using CQL version 2.
+
+This is blocked on RT #92825
 
 =back
 

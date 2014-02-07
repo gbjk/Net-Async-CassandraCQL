@@ -32,6 +32,10 @@ to the C<params_meta> instance.
  columns column_name column_shortname column_type find_column
  encode_data decode_data
 
+However, most of them are available more directly as the C<param*> methods.
+Code should not rely on these temporary redirects remaining in a future
+version.
+
 =cut
 
 sub new
@@ -108,6 +112,25 @@ sub params_meta
    return $self->{params_meta};
 }
 
+=head2 $n_params = $query->params
+
+=head2 $name = $query->param_name( $idx )
+
+=head2 ( $keyspace, $table, $column ) = $query->param_name( $idx )
+
+=head2 $name = $query->param_shortname( $idx )
+
+=head2 $type = $query->param_type( $idx )
+
+Redirections to the appropriately named method on the C<params_meta> object.
+
+=cut
+
+sub params          { shift->params_meta->columns }
+sub param_name      { shift->params_meta->column_name( @_ ) }
+sub param_shortname { shift->params_meta->column_shortname( @_ ) }
+sub param_type      { shift->params_meta->column_type( @_ ) }
+
 =head2 $query->execute( $data, $consistency ) ==> ( $type, $result )
 
 Executes the query on the Cassandra connection object that created it,
@@ -125,21 +148,23 @@ sub execute
    my $self = shift;
    my ( $data, $consistency ) = @_;
 
+   my $params_meta = $self->params_meta;
+
    my @data;
    if( ref $data eq "ARRAY" ) {
       @data = @$data;
    }
    elsif( ref $data eq "HASH" ) {
-      @data = ( undef ) x $self->columns;
+      @data = ( undef ) x $params_meta->columns;
       foreach my $name ( keys %$data ) {
-         my $idx = $self->find_column( $name );
+         my $idx = $params_meta->find_column( $name );
          defined $idx or croak "Unknown bind column name '$name'";
-         defined $data[$idx] and croak "Cannot bind column ".$self->column_name($idx)." twice";
+         defined $data[$idx] and croak "Cannot bind column ".$params_meta->column_name($idx)." twice";
          $data[$idx] = $data->{$name};
       }
    }
 
-   my @bytes = $self->encode_data( @data );
+   my @bytes = $params_meta->encode_data( @data );
 
    return $self->{cassandra}->execute( $self, \@bytes, $consistency );
 }

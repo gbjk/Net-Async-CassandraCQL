@@ -149,6 +149,11 @@ not specified.
 Optional. If set, prefer to pick primary nodes from the given data center,
 only falling back on others if there are not enough available.
 
+=item cql_version => INT
+
+Optional. Version of the CQL wire protocol to negotiate during connection.
+Defaults to 1.
+
 =back
 
 =cut
@@ -173,6 +178,8 @@ sub _init
    #   $query is_weak; timer undef => normal user use
    #   $query non-weak; timer exists => due to expire soon
 
+   $self->{cql_version} = 1;
+
    $self->SUPER::_init( $params );
 }
 
@@ -186,7 +193,8 @@ sub configure
    }
 
    foreach (qw( hosts service username password keyspace default_consistency
-                prefer_dc on_node_up on_node_down on_node_new on_node_removed )) {
+                prefer_dc cql_version
+                on_node_up on_node_down on_node_new on_node_removed )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
 
@@ -301,7 +309,7 @@ sub _connect_node
          $self->remove_child( $node );
          $self->_closed_node( $node->nodeid );
       },
-      map { $_ => $self->{$_} } qw( username password ),
+      map { $_ => $self->{$_} } qw( username password cql_version ),
    );
    $self->add_child( $conn );
 

@@ -78,6 +78,11 @@ The following named parameters may be passed to C<new> or C<configure>:
 
 Optional. Authentication details to use for C<PasswordAuthenticator>.
 
+=item cql_version => INT
+
+Optional. Version of the CQL wire protocol to negotiate during connection.
+Defaults to 1.
+
 =back
 
 =cut
@@ -89,6 +94,7 @@ sub _init
 
    $self->{streams} = []; # map [1 .. 127] to Future
    $self->{pending} = []; # queue of [$opcode, $frame, $f]
+   $self->{cql_version} = 1;
 }
 
 sub configure
@@ -96,7 +102,7 @@ sub configure
    my $self = shift;
    my %params = @_;
 
-   foreach (qw( username password
+   foreach (qw( username password cql_version
                 on_event on_topology_change on_status_change on_schema_change )) {
       $self->{$_} = delete $params{$_} if exists $params{$_};
    }
@@ -121,12 +127,18 @@ sub nodeid
    $self->{nodeid};
 }
 
+sub _version
+{
+   my $self = shift;
+   return $self->{cql_version};
+}
+
 # function
 sub _decode_result
 {
-   my ( $response ) = @_;
+   my ( $version, $response ) = @_;
 
-   my ( $type, $result ) = parse_result_frame( 1, $response );
+   my ( $type, $result ) = parse_result_frame( $version, $response );
 
    if( $type == RESULT_VOID ) {
       return Future->new->done();
@@ -185,8 +197,13 @@ sub on_read
 
    my ( $version, $flags, $streamid, $opcode, $body ) = parse_frame( $$buffref ) or return 0;
 
-   # v1 response
-   $version == 0x81 or
+   $version & 0x80 or
+      $self->fail_all_and_close( "Expected response to have RESPONSE bit set" ), return;
+   $version &= 0x7f;
+
+   # Test version <= for now in case of "unsupported protocol version" error messages, and
+   # test it exactly later
+   $version <= $self->_version or
       $self->fail_all_and_close( sprintf "Unexpected message version %#02x\n", $version ), return;
 
    if( $flags & FLAG_COMPRESS ) {
@@ -203,11 +220,14 @@ sub on_read
       undef $self->{streams}[$streamid];
 
       if( $opcode == OPCODE_ERROR ) {
-         my ( $err, $message ) = parse_error_frame( 1, $frame );
+         my ( $err, $message ) = parse_error_frame( $version, $frame );
          $f->fail( "OPCODE_ERROR: $message\n", $err, $frame );
       }
       else {
-         $f->done( $opcode, $frame );
+         $version == $self->_version or
+            $self->fail_all_and_close( sprintf "Unexpected message version %#02x\n", $version ), return;
+
+         $f->done( $opcode, $frame, $version );
       }
 
       if( my $next = shift @{ $self->{pending} } ) {
@@ -219,7 +239,7 @@ sub on_read
       }
    }
    elsif( $streamid == 0 and $opcode == OPCODE_ERROR ) {
-      my ( $err, $message ) = parse_error_frame( 1, $frame );
+      my ( $err, $message ) = parse_error_frame( $version, $frame );
       $self->fail_all_and_close( "OPCODE_ERROR: $message\n", $err, $frame );
    }
    elsif( $streamid == 0xff and $opcode == OPCODE_EVENT ) {
@@ -237,7 +257,7 @@ sub _event
    my $self = shift;
    my ( $frame ) = @_;
 
-   my ( $name, @args ) = parse_event_frame( 1, $frame );
+   my ( $name, @args ) = parse_event_frame( $self->_version, $frame );
 
    $self->maybe_invoke_event( "on_".lc($name), @args )
       or $self->maybe_invoke_event( on_event => $name, @args );
@@ -277,11 +297,11 @@ sub fail_all_and_close
    return Future->new->fail( $failure );
 }
 
-=head2 $conn->send_message( $opcode, $frame ) ==> ( $reply_opcode, $reply_frame )
+=head2 $conn->send_message( $opcode, $frame ) ==> ( $reply_opcode, $reply_frame, $reply_version )
 
 Sends a message with the given opcode and L<Protocol::CassandraCQL::Frame> for
-the message body. The returned Future will yield the response opcode and
-frame.
+the message body. The returned Future will yield the response opcode, frame
+and version number (with the RESPONSE bit masked off).
 
 This is a low-level method; applications should instead use one of the wrapper
 methods below.
@@ -331,7 +351,7 @@ sub _send
       $body = $body_compressed;
    }
 
-   $self->write( build_frame( 0x01, $flags, $id, $opcode, $body ) );
+   $self->write( build_frame( $self->_version, $flags, $id, $opcode, $body ) );
 
    $self->{streams}[$id] = $f;
 }
@@ -349,18 +369,19 @@ sub startup
 {
    my $self = shift;
 
-   $self->send_message( OPCODE_STARTUP, build_startup_frame( 1, options => {
+   $self->send_message( OPCODE_STARTUP, build_startup_frame( $self->_version,
+      options => {
          CQL_VERSION => "3.0.5",
          COMPRESSION => "Snappy",
       } )
    )->then( sub {
-      my ( $op, $response ) = @_;
+      my ( $op, $response, $version ) = @_;
 
       if( $op == OPCODE_READY ) {
          return Future->new->done;
       }
       elsif( $op == OPCODE_AUTHENTICATE ) {
-         return $self->_authenticate( parse_authenticate_frame( 1, $response ) );
+         return $self->_authenticate( parse_authenticate_frame( $version, $response ) );
       }
       else {
          return $self->fail_all_and_close( "Expected OPCODE_READY or OPCODE_AUTHENTICATE" );
@@ -378,12 +399,13 @@ sub _authenticate
          defined $self->{$_} or croak "Cannot authenticate by password without $_";
       }
 
-      $self->send_message( OPCODE_CREDENTIALS, build_credentials_frame( 1, credentials => {
+      $self->send_message( OPCODE_CREDENTIALS, build_credentials_frame( $self->_version,
+         credentials => {
             username => $self->{username},
             password => $self->{password},
          } )
       )->then( sub {
-         my ( $op, $response ) = @_;
+         my ( $op, $response, $version ) = @_;
          $op == OPCODE_READY or return $self->fail_all_and_close( "Expected OPCODE_READY" );
 
          return Future->new->done;
@@ -409,10 +431,10 @@ sub options
    $self->send_message( OPCODE_OPTIONS,
       Protocol::CassandraCQL::Frame->new
    )->then( sub {
-      my ( $op, $response ) = @_;
+      my ( $op, $response, $version ) = @_;
       $op == OPCODE_SUPPORTED or return Future->new->fail( "Expected OPCODE_SUPPORTED" );
 
-      my ( $opts ) = parse_supported_frame( 1, $response );
+      my ( $opts ) = parse_supported_frame( $version, $response );
       return Future->new->done( $opts );
    });
 }
@@ -442,14 +464,14 @@ sub query
    my $self = shift;
    my ( $cql, $consistency ) = @_;
 
-   $self->send_message( OPCODE_QUERY, build_query_frame( 1,
+   $self->send_message( OPCODE_QUERY, build_query_frame( $self->_version,
          cql         => $cql,
          consistency => $consistency,
       )
    )->then( sub {
-      my ( $op, $response ) = @_;
+      my ( $op, $response, $version ) = @_;
       $op == OPCODE_RESULT or return Future->new->fail( "Expected OPCODE_RESULT" );
-      return _decode_result( $response );
+      return _decode_result( $version, $response );
    });
 }
 
@@ -465,14 +487,14 @@ sub prepare
    my $self = shift;
    my ( $cql, $cassandra ) = @_;
 
-   $self->send_message( OPCODE_PREPARE, build_prepare_frame( 1,
+   $self->send_message( OPCODE_PREPARE, build_prepare_frame( $self->_version,
          cql => $cql,
       )
    )->then( sub {
-      my ( $op, $response ) = @_;
+      my ( $op, $response, $version ) = @_;
       $op == OPCODE_RESULT or return Future->new->fail( "Expected OPCODE_RESULT" );
 
-      my ( $type, $result ) = parse_result_frame( 1, $response );
+      my ( $type, $result ) = parse_result_frame( $version, $response );
       $type == RESULT_PREPARED or return Future->new->fail( "Expected RESULT_PREPARED" );
 
       my ( $id, $params_meta ) = @$result;
@@ -504,15 +526,15 @@ sub execute
    my $self = shift;
    my ( $id, $data, $consistency ) = @_;
 
-   $self->send_message( OPCODE_EXECUTE, build_execute_frame( 1,
+   $self->send_message( OPCODE_EXECUTE, build_execute_frame( $self->_version,
          id          => $id,
          values      => $data,
          consistency => $consistency
       )
    )->then( sub {
-      my ( $op, $response ) = @_;
+      my ( $op, $response, $version ) = @_;
       $op == OPCODE_RESULT or return Future->new->fail( "Expected OPCODE_RESULT" );
-      return _decode_result( $response );
+      return _decode_result( $version, $response );
    });
 }
 
@@ -529,11 +551,11 @@ sub register
    my $self = shift;
    my ( $events ) = @_;
 
-   $self->send_message( OPCODE_REGISTER, build_register_frame( 1,
+   $self->send_message( OPCODE_REGISTER, build_register_frame( $self->_version,
          events => $events,
       )
    )->then( sub {
-      my ( $op, $response ) = @_;
+      my ( $op, $response, $version ) = @_;
       $op == OPCODE_READY or Future->new->fail( "Expected OPCODE_READY" );
 
       return Future->new->done;

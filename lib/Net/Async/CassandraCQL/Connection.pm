@@ -439,7 +439,7 @@ sub options
    });
 }
 
-=head2 $conn->query( $cql, $consistency ) ==> ( $type, $result )
+=head2 $conn->query( $cql, $consistency, %other_args ) ==> ( $type, $result )
 
 Performs a CQL query. On success, the values returned from the Future will
 depend on the type of query.
@@ -457,16 +457,20 @@ L<Protocol::CassandraCQL::Result> containing the returned row data.
 For other queries, such as C<INSERT>, C<UPDATE> and C<DELETE>, the future
 returns nothing.
 
+Any other arguments will be passed on to the underlying C<build_query_frame>
+function of L<Protocol::CassandraCQL::Frames>.
+
 =cut
 
 sub query
 {
    my $self = shift;
-   my ( $cql, $consistency ) = @_;
+   my ( $cql, $consistency, %other_args ) = @_;
 
    $self->send_message( OPCODE_QUERY, build_query_frame( $self->_version,
          cql         => $cql,
          consistency => $consistency,
+         %other_args,
       )
    )->then( sub {
       my ( $op, $response, $version ) = @_;
@@ -510,11 +514,13 @@ sub prepare
    });
 }
 
-=head2 $conn->execute( $id, $data, $consistency ) ==> ( $type, $result )
+=head2 $conn->execute( $id, $data, $consistency, %other_args ) ==> ( $type, $result )
 
 Executes a previously-prepared statement, given its ID and the binding data.
 On success, the returned Future will yield results of the same form as the
 C<query> method. C<$data> should contain a list of encoded byte-string values.
+Any other arguments will be passed on to the underlying C<build_execute_frame>
+function of L<Protocol::CassandraCQL::Frames>.
 
 Normally this method is not directly required - instead, use the C<execute>
 method on the query object itself, as this will encode the parameters
@@ -525,12 +531,13 @@ correctly.
 sub execute
 {
    my $self = shift;
-   my ( $id, $data, $consistency ) = @_;
+   my ( $id, $data, $consistency, %other_args ) = @_;
 
    $self->send_message( OPCODE_EXECUTE, build_execute_frame( $self->_version,
          id          => $id,
          values      => $data,
-         consistency => $consistency
+         consistency => $consistency,
+         %other_args,
       )
    )->then( sub {
       my ( $op, $response, $version ) = @_;

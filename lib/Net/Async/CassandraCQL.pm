@@ -716,7 +716,7 @@ sub _get_a_node
    die "ARGH: don't have a primary node";
 }
 
-=head2 $cass->query( $cql, $consistency ) ==> ( $type, $result )
+=head2 $cass->query( $cql, $consistency, %other_args ) ==> ( $type, $result )
 
 Performs a CQL query. On success, the values returned from the Future will
 depend on the type of query.
@@ -733,6 +733,35 @@ L<Protocol::CassandraCQL::Result> containing the returned row data.
 
 For other queries, such as C<INSERT>, C<UPDATE> and C<DELETE>, the future
 returns nothing.
+
+C<%other_args> may be any of the following, when using C<cql_version> 2 or
+above:
+
+=over 8
+
+=item skip_metadata => BOOL
+
+Requests the server does not include result metadata in the response. It will
+be up to the caller to provide this, via C<set_metadata> on the returned
+Result object, before it can be used.
+
+=item page_size => INT
+
+Requests that the server returns at most the given number of rows. If any
+further remain, the result object will include the C<paging_state> field. This
+can be passed in another C<query> call to obtain the next set of data.
+
+=item paging_state => INT
+
+Requests that the server continues a paged request from this position, given
+in a previous response.
+
+=item serial_consistency => INT
+
+Sets the consistency level for serial operations in the query. Must be one of
+C<CONSISTENCY_SERIAL> or C<CONSISTENCY_LOCAL_SERIAL>.
+
+=back
 
 =cut
 
@@ -765,7 +794,7 @@ sub _debug_wrap_result
 sub query
 {
    my $self = shift;
-   my ( $cql, $consistency ) = @_;
+   my ( $cql, $consistency, %other_args ) = @_;
 
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'query' needs a consistency level";
@@ -773,11 +802,11 @@ sub query
    _debug_wrap_result QUERY => $self, $self->_get_a_node->then( sub {
       my $node = shift;
       $self->debug_printf( "QUERY on {%s}: %s", $node->nodeid, $cql );
-      $node->query( $cql, $consistency );
+      $node->query( $cql, $consistency, %other_args );
    });
 }
 
-=head2 $cass->query_rows( $cql, $consistency ) ==> $result
+=head2 $cass->query_rows( $cql, $consistency, %other_args ) ==> $result
 
 A shortcut wrapper for C<query> which expects a C<rows> result and returns it
 directly. Any other result is treated as an error. The returned Future returns
@@ -788,9 +817,8 @@ a C<Protocol::CassandraCQL::Result> directly
 sub query_rows
 {
    my $self = shift;
-   my ( $cql, $consistency ) = @_;
 
-   $self->query( $cql, $consistency )->then( sub {
+   $self->query( @_ )->then( sub {
       my ( $type, $result ) = @_;
       $type eq "rows" or Future->new->fail( "Expected 'rows' result" );
       Future->new->done( $result );
@@ -866,7 +894,7 @@ sub _expire_query
       });
 }
 
-=head2 $cass->execute( $query, $data, $consistency ) ==> ( $type, $result )
+=head2 $cass->execute( $query, $data, $consistency, %other_args ) ==> ( $type, $result )
 
 Executes a previously-prepared statement, given the binding data. On success,
 the returned Future will yield results of the same form as the C<query>
@@ -876,12 +904,14 @@ Normally this method is not directly required - instead, use the C<execute>
 method on the query object itself, as this will encode the parameters
 correctly.
 
+C<%other_args> may be as for the C<query> method.
+
 =cut
 
 sub execute
 {
    my $self = shift;
-   my ( $query, $data, $consistency ) = @_;
+   my ( $query, $data, $consistency, %other_args ) = @_;
 
    $consistency //= $self->{default_consistency};
    defined $consistency or croak "'execute' needs a consistency level";
@@ -889,7 +919,7 @@ sub execute
    _debug_wrap_result EXECUTE => $self, $self->_get_a_node->then( sub {
       my $node = shift;
       $self->debug_printf( "EXECUTE on {%s}: %s [%s]", $node->nodeid, $query->cql, unpack "H*", $query->id );
-      $node->execute( $query->id, $data, $consistency );
+      $node->execute( $query->id, $data, $consistency, %other_args );
    });
 }
 

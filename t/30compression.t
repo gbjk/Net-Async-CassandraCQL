@@ -33,6 +33,8 @@ SKIP: {
 
    $S2->syswrite( "\x81\x00\x01\x02\0\0\0\0" );
 
+   wait_for { $f->is_ready };
+
    $stream = "";
 
    # Something sure to compress
@@ -84,6 +86,8 @@ SKIP: {
    wait_for_stream { length $stream > 8 } $S2 => $stream;
 
    $S2->syswrite( "\x82\x00\x01\x02\0\0\0\0" );
+
+   wait_for { $f->is_ready };
 
    $stream = "";
 

@@ -43,7 +43,7 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
  my $cass = Net::Async::CassandraCQL->new(
     host => "localhost",
-    keyspace => "my-keyspace",
+    keyspace => "my_keyspace",
     default_consistency => CONSISTENCY_QUORUM,
  );
  $loop->add( $cass );
@@ -54,7 +54,7 @@ C<Net::Async::CassandraCQL> - use Cassandra databases with L<IO::Async> using CQ
 
  my @f;
  foreach my $number ( 1 .. 100 ) {
-    push @f, $cass->query( "INSERT INTO numbers (v) VALUES $number" );
+    push @f, $cass->query( "INSERT INTO numbers (v) VALUES ($number)" );
  }
  Future->needs_all( @f )->get;
 

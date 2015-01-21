@@ -519,7 +519,7 @@ sub _pick_new_eventwatch
       $self->{event_ids}{$nodeid} = 1;
 
       my $node = $self->{nodes}{$nodeid};
-      $node->{ready_f}->on_done( sub {
+      $node->{ready_f} = $node->{ready_f}->then( sub {
          my $conn = shift;
          $conn->configure(
             on_topology_change => $self->{on_topology_change_cb},
@@ -529,7 +529,8 @@ sub _pick_new_eventwatch
             ->on_fail( sub {
                delete $self->{event_ids}{$nodeid};
                $self->_pick_new_eventwatch
-            });
+            })
+         ->then_done( $conn );
       });
    }
 }

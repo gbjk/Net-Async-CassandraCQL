@@ -33,6 +33,7 @@ is( $connect_host, "my-seed", '->connect host' );
 ok( !$f->is_ready, '$f not yet ready' );
 
 my @pending_queries;
+my $registered;
 my $conn = TestConnection->new;
 $cass->add_child( $conn );
 $conn_f->done( $conn );
@@ -82,10 +83,12 @@ while( @pending_queries ) {
 }
 
 ok( $f->is_ready, '$f is now ready' );
+ok( $registered, '->register was invoked' );
 
 # ->query on the primary
 {
    $f = $cass->query( "DO SOMETHING now", 0 );
+   $f->on_fail( sub { die @_ } );
 
    ok( scalar @pending_queries, '@pending_queries after ->query' );
    my $q = shift @pending_queries;
@@ -131,4 +134,11 @@ sub query
    my ( $cql ) = @_;
    push @pending_queries, [ $self, $cql, my $f = Future->new ];
    return $f;
+}
+
+sub register
+{
+   $registered++;
+
+   Future->done;
 }

@@ -3,6 +3,8 @@ Revision history for Net-Async-CassandraCQL
 0.11_1  2015/01/25 14:00:00
         [BUGFIXES]
          * Fix eventwatch failure not propogating, and losing sequence Futures
+         * Fix requests over pending threshold getting responses from other requests
+
 
 0.11    2014/06/01 12:35:56
         [CHANGES]

@@ -828,7 +828,8 @@ sub query_rows
 
    $self->query( @_ )->then( sub {
       my ( $type, $result ) = @_;
-      $type eq "rows" or Future->new->fail( "Expected 'rows' result" );
+      defined $type   or return Future->new->fail( "Expected type from query" );
+      $type eq "rows" or return Future->new->fail( "Expected 'rows' result" );
       Future->new->done( $result );
    });
 }

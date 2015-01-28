@@ -1,4 +1,5 @@
 requires "Devel::GlobalDestruction";
+requires "Devel::Refcount";
 requires "Future";
 requires "Future::Utils";
 requires "IO::Async";

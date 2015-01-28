@@ -9,12 +9,13 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.11';
+our $VERSION = '0.11_2';
 
 use base qw( IO::Async::Notifier );
 
 use Carp;
 
+use Devel::Refcount qw/ refcount /;
 use Future::Utils qw( fmap_void try_repeat_until_success );
 use List::Util qw( shuffle );
 use Scalar::Util qw( weaken );
@@ -28,6 +29,11 @@ use constant DEFAULT_CQL_PORT => 9042;
 
 # Time after which down nodes will be retried
 use constant NODE_RETRY_TIME => 60;
+
+# How long after a query is last used to keep it alive on a pacemaker
+use constant QUERY_TTL => 60;
+# How often the pacemaker checks the query isn't the only thing keeping the whole stack alive
+use constant QUERY_PACEMAKER_INTERVAL => 0.5;
 
 =head1 NAME
 
@@ -173,7 +179,7 @@ sub _init
       shift->_on_status_change( @_ );
    });
 
-   $self->{queries_by_cql} = {}; # {$cql} => [$query, $expire_timer_f]
+   $self->{queries_by_cql} = {}; # {$cql} => {query => $query, pacemaker => $expire_timer_f, ttl => Int]
    # Can be in two states:
    #   $query is_weak; timer undef => normal user use
    #   $query non-weak; timer exists => due to expire soon
@@ -499,7 +505,7 @@ sub _ready_node
       return $conn_f unless keys %$queries_by_cql;
 
       ( fmap_void {
-         my $query = shift->[0] or return Future->new->done;
+         my $query = shift->{query} or return Future->new->done;
          $conn->prepare( $query->cql, $self );
       } foreach => [ values %$queries_by_cql ] )
          ->then( sub { $conn_f } );
@@ -855,11 +861,11 @@ sub prepare
    my $queries_by_cql = $self->{queries_by_cql};
 
    if( my $q = $queries_by_cql->{$cql} ) {
-      my $query = $q->[0];
-      if( $q->[1] ) {
-         $q->[1]->cancel;
-         undef $q->[1];
-         weaken( $q->[0] );
+      my $query = $q->{query};
+      if( $q->{pacemaker} ) {
+         $q->{pacemaker}->cancel;
+         undef $q->{pacemaker};
+         weaken( $q->{query} );
       }
       return Future->new->done( $query );
    }
@@ -877,11 +883,42 @@ sub prepare
 
       $self->debug_printf( "PREPARE => [%s]", unpack "H*", $query->id );
 
-      my $q = $queries_by_cql->{$cql} = [ $query, undef ];
-      weaken( $q->[0] );
+      my $q = $queries_by_cql->{$cql} = { query => $query };
+      weaken( $q->{query} );
 
       Future->new->done( $query );
    });
+}
+
+# Check if a query cache is the only thing keeping a query alive
+sub _check_query_pacemaker {
+   my ($self, $cql) = @_;
+
+   weaken $self;
+
+   my $q = $self->{queries_by_cql}{$cql};
+
+   my $query = $q->{query};
+
+   $q->{ttl} -= QUERY_PACEMAKER_INTERVAL;
+
+   # 1) Without a loop, there's nothing we can do anyway
+   # 2) Otherwise we've kept this query alive long enough
+   # 3) Otherwise Cassandra and loop is being artificialy kept alive by us.
+   # ( 2 references because Loop has a reference to cassandra in notifiers, and this query has one )
+   if ($q->{ttl} <= 0 || refcount($self) == 2 || !$self->loop){
+
+      # Remove the {cassandra} element from the query so it doesn't
+      # re-register itself for expiry when it is DESTROYed again
+      undef $query->{cassandra};
+
+      delete $self->{queries_by_cql}{$cql};
+   }
+   else {
+      $q->{pacemaker} = $self->loop->delay_future( after => QUERY_PACEMAKER_INTERVAL )->on_done(
+         sub { $self->_check_query_pacemaker( $cql ) }
+      );
+   }
 }
 
 sub _expire_query
@@ -892,15 +929,16 @@ sub _expire_query
    my $queries_by_cql = $self->{queries_by_cql};
    my $q = $queries_by_cql->{$cql} or return;
 
-   my $query = $q->[0]; undef $q->[0]; $q->[0] = $query; # unweaken
+   # Unweaken the query itself, so it'll survive destruction
+   my $query = $q->{query};
+   undef $q->{query};
+   $q->{query} = $query;
+   $q->{ttl}   = QUERY_TTL;
 
-   $q->[1] = $self->loop->delay_future( after => 60 )
-      ->on_done( sub {
-         # Remove the {cassandra} element from the query so it doesn't
-         # re-register itself for expiry when it is DESTROYed again
-         undef $q->[0]{cassandra};
-         delete $queries_by_cql->{$cql};
-      });
+   if ($self->loop){
+     $q->{pacemaker} //= $self->loop->delay_future( after => QUERY_PACEMAKER_INTERVAL )
+        ->on_done( sub { $self->_check_query_pacemaker( $cql ) } );
+   }
 }
 
 =head2 $cass->execute( $query, $data, $consistency, %other_args ) ==> ( $type, $result )

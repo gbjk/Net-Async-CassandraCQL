@@ -510,29 +510,33 @@ sub _pick_new_eventwatch
 {
    my $self = shift;
 
-   my @primaries = keys %{ $self->{primary_ids} };
+   # Only the primaries which haven't been watched already
+   my @primaries = grep { !$self->{event_ids}{ $_ } } keys %{ $self->{primary_ids} };
 
-   {
-      my $nodeid = $primaries[rand @primaries];
-      redo if $self->{event_ids}{$nodeid};
+   # If there aren't any futues left to try, don't create an infinite loop
+   # Don't expect this to happen, but just in case
+   return Future->fail('No primary node available to eventwatch') unless @primaries;
 
-      $self->{event_ids}{$nodeid} = 1;
+   my $nodeid = $primaries[int rand @primaries];
 
-      my $node = $self->{nodes}{$nodeid};
-      $node->{ready_f} = $node->{ready_f}->then( sub {
+   $self->{event_ids}{$nodeid} = 1;
+
+   my $node = $self->{nodes}{$nodeid} or die "Expected node: '$nodeid' to exist";
+
+   return $node->{ready_f} = $node->{ready_f}->then( sub {
          my $conn = shift;
          $conn->configure(
             on_topology_change => $self->{on_topology_change_cb},
             on_status_change   => $self->{on_status_change_cb},
          );
          $conn->register( [qw( TOPOLOGY_CHANGE STATUS_CHANGE )] )
-            ->on_fail( sub {
-               delete $self->{event_ids}{$nodeid};
-               $self->_pick_new_eventwatch
-            })
-         ->then_done( $conn );
-      });
-   }
+         ->then_done($conn)
+         ->else( sub {
+           delete $self->{event_ids}{$nodeid};
+           # Return the new attempt to eventwatch a differnt primary
+           return $self->_pick_new_eventwatch;
+          });
+    });
 }
 
 sub _on_topology_change

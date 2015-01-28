@@ -1,5 +1,9 @@
 Revision history for Net-Async-CassandraCQL
 
+0.11_3  2015/01/28 18:00:00
+        [BUGFIXES]
+         * Fix refcount dependency
+
 0.11_2  2015/01/28 09:00:00
         [BUGFIXES]
          * Fix query cache keeping loop alive for 60 seconds after it should be removed

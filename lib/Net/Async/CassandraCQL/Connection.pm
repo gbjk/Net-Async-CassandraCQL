@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.11';
+our $VERSION = '0.11_2';
 
 use base qw( IO::Async::Stream );
 IO::Async::Stream->VERSION( '0.59' );

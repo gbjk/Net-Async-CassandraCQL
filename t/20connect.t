@@ -122,12 +122,17 @@ done_testing;
 
 package TestConnection;
 use base qw( Net::Async::CassandraCQL::Connection );
+use Protocol::CassandraCQL qw/:opcodes/;
 
 sub nodeid
 {
    return "10.0.0.1";
 }
 
+# To handle the register
+sub send_message {
+    return Future->done( OPCODE_READY );
+}
 sub query
 {
    my $self = shift;

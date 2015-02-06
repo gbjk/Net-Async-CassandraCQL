@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use 5.010;
 
-our $VERSION = '0.11';
+our $VERSION = '0.11_4';
 
 use base qw( IO::Async::Stream );
 IO::Async::Stream->VERSION( '0.59' );
@@ -20,6 +20,10 @@ use Future 0.13;
 
 use constant HAVE_SNAPPY => eval { require Compress::Snappy };
 use constant HAVE_LZ4    => eval { require Compress::LZ4 };
+
+# Max streams 127, because of streamid packed in the native protocol as C.
+# Version 3 of the protocol changes that, and this can be raised
+use constant MAX_STREAMS => 127;
 
 use Protocol::CassandraCQL qw(
    :opcodes :results :consistencies FLAG_COMPRESS
@@ -218,7 +222,11 @@ sub on_read
    my $frame = Protocol::CassandraCQL::Frame->new( $body );
 
    if( my $f = $self->{streams}[$streamid] ) {
-      undef $self->{streams}[$streamid];
+
+      if ($opcode == OPCODE_AUTHENTICATE){
+        # Authenticates *do* get to run their futures ahead of anything in Pending,
+        undef $self->{streams}[$streamid];
+        }
 
       if( $opcode == OPCODE_ERROR ) {
          my ( $err, $message ) = parse_error_frame( $version, $frame );
@@ -231,7 +239,14 @@ sub on_read
          $f->done( $opcode, $frame, $version );
       }
 
-      if( my $next = shift @{ $self->{pending} } ) {
+      # Undefined after running $f->done, so that $f doesn't get to jump the queue ahead of pending requests
+      # NB: Moving this above $f->done would mean protecting pending against assuming this streamid is still free
+      unless ($opcode == OPCODE_AUTHENTICATE){
+        undef $self->{streams}[$streamid];
+        }
+
+      # streamid may have been re-populated by a new send_message to AUTHENTICATE
+      if( !$self->{streams}[$streamid] and my $next = shift @{ $self->{pending} } ) {
          my ( $opcode, $frame, $f ) = @$next;
          $self->_send( $opcode, $streamid, $frame, $f );
       }
@@ -325,7 +340,7 @@ sub send_message
    }
 
    if( !defined $id ) {
-      if( $#$streams == 127 ) {
+      if( $#$streams == MAX_STREAMS ) {
          push @{ $self->{pending} }, [ $opcode, $frame, $f ];
          return $f;
       }

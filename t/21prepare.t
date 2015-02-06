@@ -149,14 +149,14 @@ $loop->add( $cass );
 
    # Should now be weak with a timer
    # CHEATING
-   ok( defined $cass->{queries_by_cql}{+CQL_STRING}[1],
+   ok( defined $cass->{queries_by_cql}{+CQL_STRING}{pacemaker},
        'Query has expiry timer' );
 
    # A second ->prepare should re-vivify it
    $f = $cass->prepare( CQL_STRING );
 
    ok( $f->is_ready, '->prepare again is ready immediately' );
-   ok( !defined $cass->{queries_by_cql}{+CQL_STRING}[1],
+   ok( !defined $cass->{queries_by_cql}{+CQL_STRING}{pacemaker},
        'Expiry timer cancelled after re-vivify' );
 
    # Now drop it one last time
@@ -164,7 +164,8 @@ $loop->add( $cass );
    undef $query;
 
    # Rather than wait for the timer, just fire it now
-   $cass->{queries_by_cql}{+CQL_STRING}[1]->done;
+   $cass->{queries_by_cql}{+CQL_STRING}{ttl} = 0;
+   $cass->{queries_by_cql}{+CQL_STRING}{pacemaker}->done;
 
    ok( !keys %{ $cass->{queries_by_cql} },
        '$cass has no more cached queries after timer expire' );

@@ -125,6 +125,8 @@ The hostnames of Cassandra node to connect to initially. If more than one host
 is provided in an array, they will be attempted sequentially until one
 succeeds during the intial connect phase.
 
+If a host contains :$service, then the service parameter will be overidden for this host.
+
 =item service => STRING
 
 Optional. The service name or port number to connect to.
@@ -296,7 +298,8 @@ Takes the following named arguments:
 
 A set of host names are required, either as a named argument or as a
 configured value on the object. If the service name is missing, the default
-CQL port will be used instead.
+CQL port will be used instead. If a host contains a :$service, that overrides
+both the service passed in, and the service on this object.
 
 =cut
 
@@ -306,6 +309,10 @@ sub _connect_node
 {
    my $self = shift;
    my ( $host, $service ) = @_;
+
+   if ($host =~ s/:(\d+)$//){
+      $service = $1;
+      }
 
    $service //= $self->{service} // DEFAULT_CQL_PORT;
 

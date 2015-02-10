@@ -93,8 +93,7 @@ behaviours and limits of its ability to communicate with Cassandra.
 
 =head2 on_node_down $nodeid
 
-The node's status has changed. C<$nodeid> is the node's IP address as a text
-string.
+The node's status has changed. C<$nodeid> is the node's UUID host_id.
 
 =head2 on_node_new $nodeid
 
@@ -231,8 +230,7 @@ sub _inet_to_string
    return inet_ntop( $family, $addr );
 }
 
-# function
-sub _nodeid_to_string
+sub _addr_to_string
 {
    my ( $node ) = @_;
 
@@ -402,13 +400,19 @@ sub connect
 
       $self->{nodes} = \my %nodes;
       foreach my $node ( @nodes ) {
-         my $n = $nodes{$node->{host}} = {
+         my $n = $nodes{$node->{host_id}} = {
             data_center => $node->{data_center},
             rack        => $node->{rack},
+            host_id     => $node->{host_id},
          };
 
-         if( $node->{host} eq $conn->nodeid ) {
+         # The node we got from system.local has no host
+         if( ! exists $node->{host} ){
             $n->{conn} = $conn;
+            $conn->{nodeid} = $node->{host_id};
+         }
+         else {
+            $n->{host} = $node->{host};
          }
       }
 
@@ -492,6 +496,18 @@ sub _connect_new_primary
    });
 }
 
+sub _node_for_host
+{
+   my $self = shift;
+   my ( $host ) = @_;
+
+   my $nodes = $self->{nodes};
+
+   my ($node) = grep { $_->{host} eq $host } values %$nodes;
+
+   return $node;
+}
+
 sub _ready_node
 {
    my $self = shift;
@@ -556,25 +572,29 @@ sub _on_topology_change
 {
    my $self = shift;
    my ( $type, $addr ) = @_;
-   my $nodeid = _nodeid_to_string( $addr );
+   my $peer = _addr_to_string( $addr );
 
    my $nodes = $self->{nodes};
+   my $node = $self->_node_for_host( $peer );
 
    # These updates can happen twice if there's two event connections but
    # that's OK. Use the state to ensure printing only once
 
    if( $type eq "NEW_NODE" ) {
-      return if exists $nodes->{$nodeid};
+      return if $node;
 
-      $nodes->{$nodeid} = {};
-
-      my $f = $self->query_rows( "SELECT peer, data_center, rack FROM system.peers WHERE peer = " . $self->quote( $nodeid ), CONSISTENCY_ONE )
+      my $f = $self->query_rows( "SELECT host_id, peer, data_center, rack FROM system.peers WHERE peer = " . $self->quote( $nodeid ), CONSISTENCY_ONE )
          ->on_done( sub {
             my ( $result ) = @_;
             my $node = $result->row_hash( 0 );
             $node->{host} = _inet_to_string( delete $node->{peer} );
 
-            %{$nodes->{$nodeid}} = %$node;
+            my $nodeid = $node->{host_id};
+            $nodes->{ $nodeid } = {
+                data_center => $node->{data_center},
+                rack        => $node->{rack},
+                host_id     => $nodeid,
+            };
 
             $self->debug_printf( "NEW_NODE {%s}", $nodeid );
             $self->maybe_invoke_event( on_node_new => $nodeid );
@@ -584,7 +604,9 @@ sub _on_topology_change
       $f->on_ready( sub { undef $f } );
    }
    elsif( $type eq "REMOVED_NODE" ) {
-      return if !exists $nodes->{$nodeid};
+      return unless !exists $node;
+
+      my $nodeid = $node->{host_id};
 
       delete $nodes->{$nodeid};
       $self->debug_printf( "REMOVED_NODE {%s}", $nodeid );
@@ -596,10 +618,15 @@ sub _on_status_change
 {
    my $self = shift;
    my ( $status, $addr ) = @_;
-   my $nodeid = _nodeid_to_string( $addr );
+   my $peer = _addr_to_string( $addr );
 
-   my $nodes = $self->{nodes};
-   my $node = $nodes->{$nodeid} or return;
+
+   my $node = $self->_node_for_host( $peer );
+
+   return unless $node;
+
+   my $nodes   = $self->{nodes};
+   my $nodeid  = $node->{host_id};
 
    # These updates can happen twice if there's two event connections but
    # that's OK. Use the state to ensure printing only once
@@ -1063,15 +1090,14 @@ sub _list_nodes
    # So we'll have to look up its own information from system.local and add
    # the socket address manually.
    Future->needs_all(
-      $conn->query( "SELECT data_center, rack FROM system.local", CONSISTENCY_ONE )
+      $conn->query( "SELECT host_id, data_center, rack FROM system.local", CONSISTENCY_ONE )
          ->then( sub {
             my ( $type, $result ) = @_;
             $type eq "rows" or Future->new->fail( "Expected 'rows' result" );
             my $local = $result->row_hash( 0 );
-            $local->{host} = $conn->nodeid;
             Future->new->done( $local );
          }),
-      $conn->query( "SELECT peer, data_center, rack FROM system.peers", CONSISTENCY_ONE )
+      $conn->query( "SELECT host_id, peer, data_center, rack FROM system.peers", CONSISTENCY_ONE )
          ->then( sub {
             my ( $type, $result ) = @_;
             $type eq "rows" or Future->new->fail( "Expected 'rows' result" );

@@ -121,8 +121,7 @@ sub configure
 
 =head2 $id = $conn->nodeid
 
-Returns the connection's node ID (the string form of its IP address), which is
-used as its ID in the C<system.peers> table.
+Returns the connection's node ID, the UUID host_id in cassandra's C<system.peers> table.
 
 =cut
 
@@ -183,7 +182,6 @@ sub connect
    return ( $self->{connect_f} ||=
       $self->SUPER::connect( %args )->on_fail( sub { undef $self->{connect_f} } ) )
       ->then( sub {
-         $self->{nodeid} = $self->read_handle->peerhost;
          $self->startup
       })->then( sub { Future->new->done( $self ) });
 }

@@ -12,7 +12,6 @@ sub new
    my ( $nodeid ) = @_;
    my $self = $class->SUPER::new;
 
-   $self->{nodeid} = $nodeid;
    $self->{pending_queries} = [];
    $self->{pending_prepares} = [];
 
@@ -47,29 +46,31 @@ sub send_nodelist
    my $peers = $args{peers};
 
    while( my $q = $self->next_query ) {
-      if( $q->[1] eq "SELECT data_center, rack FROM system.local" ) {
+      if( $q->[1] eq "SELECT host_id, data_center, rack FROM system.local" ) {
          $q->[2]->done( rows =>
             Protocol::CassandraCQL::Result->new(
                columns => [
+                  [ system => local => host_id     => "UUID" ],
                   [ system => local => data_center => "VARCHAR" ],
                   [ system => local => rack        => "VARCHAR" ],
                ],
                rows => [
-                  [ $local->{dc}, $local->{rack} ],
+                  [ $local->{host_id}, $local->{dc}, $local->{rack} ],
                ],
             )
          );
       }
-      elsif( $q->[1] eq "SELECT peer, data_center, rack FROM system.peers" ) {
+      elsif( $q->[1] eq "SELECT host_id, peer, data_center, rack FROM system.peers" ) {
          $q->[2]->done( rows =>
             Protocol::CassandraCQL::Result->new(
                columns => [
+                  [ system => peeers=> host_id     => "UUID" ],
                   [ system => peers => peer        => "VARCHAR" ],
                   [ system => peers => data_center => "VARCHAR" ],
                   [ system => peers => rack        => "VARCHAR" ],
                ],
                rows => [ map { my $peer = $peers->{$_};
-                               [ inet_aton( $_ ), $peer->{dc}, $peer->{rack} ] } sort keys %$peers
+                           [ $peer->{host_id}, inet_aton( $_ ), $peer->{dc}, $peer->{rack} ] } sort keys %$peers
                        ],
             ),
          );

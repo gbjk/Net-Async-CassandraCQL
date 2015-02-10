@@ -10,6 +10,7 @@ use Test::Refcount;
 use t::MockConnection;
 use Socket qw( pack_sockaddr_in inet_aton );
 
+use Data::GUID;
 use Net::Async::CassandraCQL;
 use Protocol::CassandraCQL::Result 0.06;
 
@@ -31,11 +32,14 @@ my $f = $cass->connect;
 
 ok( my $c = $conns{"10.0.0.1"}, 'Connected to 10.0.0.1' );
 
+my $local_uuid = '92178B16-B087-11E4-9DEF-5D2BB53FAB08';
+my $other_uuid = '9217810C-B087-11E4-9DEF-5D2BB53FAB08';
+
 # Initial nodelist query
 $c->send_nodelist(
-   local => { dc => "DC1", rack => "rack1" },
+   local => { dc => "DC1", rack => "rack1", host_id => $local_uuid },
    peers => {
-      "10.0.0.2" => { dc => "DC1", rack => "rack1" },
+      "10.0.0.2" => { dc => "DC1", rack => "rack1", host_id => $other_uuid },
    },
 );
 
@@ -52,13 +56,13 @@ ok( $c->is_registered, 'Using 10.0.0.1 for events' );
    );
 
    # DOWN
-   ok( !defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 does not yet have down_time' );
+   ok( !defined $cass->{nodes}{$other_uuid}{down_time}, 'Node 10.0.0.2 does not yet have down_time' );
 
    $conns{"10.0.0.1"}->invoke_event(
       on_status_change => DOWN => pack_sockaddr_in( 0, inet_aton( "10.0.0.2" ) ),
    );
 
-   ok( defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 has down_time after STATUS_CHANGE DOWN' );
+   ok( defined $cass->{nodes}{$other_uuid}{down_time}, 'Node 10.0.0.2 has down_time after STATUS_CHANGE DOWN' );
    is( $nodeid, "10.0.0.2", '$nodeid to cluster on_node_down' );
    undef $nodeid;
 
@@ -67,7 +71,7 @@ ok( $c->is_registered, 'Using 10.0.0.1 for events' );
       on_status_change => UP => pack_sockaddr_in( 0, inet_aton( "10.0.0.2" ) ),
    );
 
-   ok( !defined $cass->{nodes}{"10.0.0.2"}{down_time}, 'Node 10.0.0.2 no longer has down_time after STATUS_CHANGE UP' );
+   ok( !defined $cass->{nodes}{$other_uuid}{down_time}, 'Node 10.0.0.2 no longer has down_time after STATUS_CHANGE UP' );
    is( $nodeid, "10.0.0.2", '$nodeid to cluster on_node_up' );
 }
 
@@ -79,13 +83,14 @@ ok( $c->is_registered, 'Using 10.0.0.1 for events' );
       on_node_removed => sub { ( undef, $nodeid ) = @_; },
    );
 
+   my $new_uuid = 'D2E188C2-B087-11E4-8175-8635B53FAB08';
    # NEW
-   ok( !defined $cass->{nodes}{"10.0.0.4"}, 'Node 10.0.0.4 does not yet exist' );
+   ok( !defined $cass->{nodes}{$new_uuid}, 'Node 10.0.0.4 does not yet exist' );
    $conns{"10.0.0.1"}->invoke_event(
       on_topology_change => NEW_NODE => pack_sockaddr_in( 0, inet_aton( "10.0.0.4" ) ),
    );
 
-   ok( defined $cass->{nodes}{"10.0.0.4"}, 'Node 10.0.0.4 exists' );
+   ok( defined $cass->{nodes}{$new_uuid}, 'Node 10.0.0.4 exists' );
 
    ok( my $q = $conns{"10.0.0.1"}->next_query, 'Peerlist query exists' );
    is( $q->[1], "SELECT peer, data_center, rack FROM system.peers WHERE peer = '10.0.0.4'", 'Peerlist query CQL' );
@@ -102,8 +107,8 @@ ok( $c->is_registered, 'Using 10.0.0.1 for events' );
       )
    );
 
-   is( $nodeid, "10.0.0.4", '$nodeid to cluster on_node_new' );
-   ok( defined $cass->{nodes}{"10.0.0.4"}{data_center}, 'Node 10.0.0.4 has known DC' );
+   is( $nodeid, $new_uuid, '$nodeid to cluster on_node_new' );
+   ok( defined $cass->{nodes}{$new_uuid}{data_center}, 'Node 10.0.0.4 has known DC' );
    undef $nodeid;
 
    # DELETE
@@ -111,9 +116,9 @@ ok( $c->is_registered, 'Using 10.0.0.1 for events' );
       on_topology_change => REMOVED_NODE => pack_sockaddr_in( 0, inet_aton( "10.0.0.4" ) ),
    );
 
-   ok( !defined $cass->{nodes}{"10.0.0.4"}, 'Node 10.0.0.4 no longer exists' );
+   ok( !defined $cass->{nodes}{$new_uuid}, 'Node 10.0.0.4 no longer exists' );
 
-   is( $nodeid, "10.0.0.4", '$nodeid to cluster on_node_removed' );
+   is( $nodeid, $new_uuid, '$nodeid to cluster on_node_removed' );
 }
 
 

@@ -8,7 +8,7 @@ package Net::Async::CassandraCQL::Query;
 use strict;
 use warnings;
 
-our $VERSION = '0.11_4';
+our $VERSION = '0.12';
 
 use Carp;
 

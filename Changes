@@ -1,5 +1,9 @@
 Revision history for Net-Async-CassandraCQL
 
+0.12    2015/02/12 16:00:00
+        [BUGFIXES]
+         * Fix queries hanging on current node close.
+
 0.11_4  2015/02/06 13:00:00
         [CHANGES]
          * Support service/port configuration per host.

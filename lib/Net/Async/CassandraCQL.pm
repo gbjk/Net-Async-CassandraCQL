@@ -321,6 +321,8 @@ sub _connect_node
          my $node = shift;
          $self->remove_child( $node );
          $self->_closed_node( $node->nodeid );
+         # Node close will fail the queries, which must happen after we've chosen a new node
+         $node->on_closed;
       },
       map { $_ => $self->{$_} } qw( username password cql_version ),
    );

@@ -17,3 +17,6 @@ _build
 ^MYMETA.yml$
 ^MYMETA\.json$
 ^t/local\.yaml$
+^local
+^.git
+^.gitignore
